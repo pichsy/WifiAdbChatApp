@@ -15,6 +15,7 @@ private struct PairingRequest: Identifiable {
     let action: Action
 }
 
+/// 电脑端：微信式聊天界面。左侧设备列表，右侧聊天记录，输入框固定在底部。
 struct LANTransferView: View {
     @EnvironmentObject private var model: LANModel
 
@@ -26,607 +27,310 @@ struct LANTransferView: View {
     @State private var pairingError: String?
     @State private var showClearConfirm = false
     @FocusState private var codeFocused: Bool
+    @FocusState private var composerFocused: Bool
 
-    private var cardFill: some View {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .fill(Color(nsColor: .controlBackgroundColor))
-    }
+    private let sidebarWidth: CGFloat = 252
 
-    private var cardStroke: some View {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .strokeBorder(Color.primary.opacity(0.07))
-    }
+    private static let sidebarBackground = Color(nsColor: NSColor(name: nil) { appearance in
+        let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        return dark ? NSColor(calibratedWhite: 0.16, alpha: 1) : NSColor(calibratedWhite: 0.95, alpha: 1)
+    })
 
     private var selectedPeer: LANPeer? {
         guard let id = model.selectedPeerID else { return nil }
         return model.peers.first { $0.id == id }
     }
 
+    private var selectedPeerPaired: Bool {
+        guard let peer = selectedPeer else { return false }
+        return model.isPaired(peer.id)
+    }
+
+    // MARK: - 主体
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                thisDeviceCard
-                peersCard
-                messagesCard
-                sendTextCard
-                sendFileCard
-                if model.busy { sendProgressRow }
-                statusLine
-                footer
-            }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        HStack(spacing: 0) {
+            sidebar
+            Divider()
+            chatPane
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .sheet(item: $pairing) { request in
             pairingSheet(request)
         }
-    }
-
-    // MARK: - 本机
-
-    private var thisDeviceCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
-                Text("本机")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text("已配对 \(model.pairedCount) 台")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if model.pairedCount > 0 {
-                    Button("清除配对") { model.forgetPairs() }
-                        .buttonStyle(.borderless)
-                        .font(.caption)
-                }
-            }
-
-            HStack(alignment: .center, spacing: 14) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(model.deviceName)
-                        .font(.headline)
-                    Text("对方第一次连接你时，输入下面这个配对码；输过一次后会自动记住")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 8)
-
-                VStack(alignment: .trailing, spacing: 3) {
-                    Text("你的配对码")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(model.pairingCode.map(String.init).joined(separator: " "))
-                        .font(.system(size: 24, weight: .semibold, design: .monospaced))
-                        .textSelection(.enabled)
-                    Button("换一个配对码") { model.regenerateCode() }
-                        .buttonStyle(.borderless)
-                        .font(.caption)
-                }
-            }
-
-            if let name = model.pendingPairName {
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "person.crop.circle.badge.questionmark")
-                        .foregroundStyle(.orange)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("「\(name)」正在请求配对")
-                            .font(.callout.weight(.medium))
-                        Text("把本机配对码 \(model.pairingCode) 告诉对方，对方输入后即可互传")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer(minLength: 6)
-                    Button("知道了") { model.clearPendingPair() }
-                        .buttonStyle(.borderless)
-                        .font(.caption)
-                }
-                .padding(8)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color.orange.opacity(0.1))
-                )
-            }
-
-            HStack(spacing: 8) {
-                Image(systemName: "tray.and.arrow.down")
-                    .foregroundStyle(.secondary)
-                Text(model.receiveDir)
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .textSelection(.enabled)
-                    .help(model.receiveDir)
-                Spacer(minLength: 6)
-                Button("修改接收目录") { model.chooseReceiveDir() }
-                    .buttonStyle(.borderless)
-                    .font(.caption)
-                Button {
-                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: model.receiveDir)])
-                } label: {
-                    Image(systemName: "folder")
-                }
-                .buttonStyle(.borderless)
-                .help("在访达中打开接收目录")
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                composerFocused = true
             }
         }
-        .padding(12)
-        .background(cardFill)
-        .overlay(cardStroke)
     }
 
-    // MARK: - 附近设备
+    // MARK: - 左侧栏
 
-    private var peersCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Color.accentColor.opacity(0.16))
+                    Image(systemName: "arrow.left.arrow.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                }
+                .frame(width: 26, height: 26)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("ADBType 传输")
+                        .font(.headline)
+                    Text("局域网直连 · 不经过服务器")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 10)
+
             HStack(spacing: 6) {
-                Text("附近设备")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
                 if model.peers.isEmpty {
                     ProgressView().controlSize(.small)
+                        .scaleEffect(0.7)
+                        .frame(width: 9, height: 9)
+                } else {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 7, height: 7)
                 }
-                Spacer()
-                Text("同一 Wi-Fi / 局域网")
+                Text(model.peers.isEmpty ? "正在搜索局域网…" : "发现 \(model.peers.count) 台设备")
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
             }
+            .padding(.horizontal, 14)
+            .padding(.bottom, 6)
 
-            if model.peers.isEmpty {
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "dot.radiowaves.left.and.right")
-                        .foregroundStyle(.secondary)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("正在搜索…")
-                            .font(.subheadline.weight(.medium))
-                        Text("在另一台 Mac 的「跨设备」页，或 Windows 电脑上打开 ADBType 传输端，并连同一个局域网")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+            Divider().padding(.horizontal, 10)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 3) {
+                    if model.peers.isEmpty {
+                        emptyPeersHint
+                    } else {
+                        ForEach(model.peers) { peer in
+                            peerRow(peer)
+                        }
                     }
                 }
-                .frame(minHeight: 34, alignment: .leading)
-            } else {
-                VStack(spacing: 4) {
-                    ForEach(model.peers) { peer in
-                        peerRow(peer)
-                    }
-                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 8)
             }
+            .frame(maxHeight: .infinity)
+
+            Divider().padding(.horizontal, 10)
+
+            localDeviceCard
+            statusStrip
         }
-        .padding(12)
-        .background(cardFill)
-        .overlay(cardStroke)
+        .frame(width: sidebarWidth)
+        .background(Self.sidebarBackground)
+    }
+
+    private var emptyPeersHint: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "dot.radiowaves.left.and.right")
+                    .font(.system(size: 13))
+                Text("等对方上线")
+                    .font(.callout.weight(.medium))
+            }
+            .foregroundStyle(.secondary)
+            Text("在另一台 Mac 的「电脑设备」页，或 Windows 电脑上打开 ADBType 传输端，并连同一个 Wi-Fi / 局域网。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 10)
     }
 
     private func peerRow(_ peer: LANPeer) -> some View {
         let selected = model.selectedPeerID == peer.id
         let paired = model.isPaired(peer.id)
         return HStack(spacing: 8) {
-            Image(systemName: selected ? "largecircle.fill.circle" : "circle")
-                .foregroundStyle(selected ? Color.accentColor : Color.secondary)
-            Image(systemName: "desktopcomputer")
-                .foregroundStyle(.secondary)
-            Text(peer.name)
-                .font(.callout.weight(selected ? .semibold : .regular))
-                .lineLimit(1)
-            if paired {
-                Text("已配对")
-                    .font(.system(size: 10, weight: .medium))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 1)
-                    .background(Capsule().fill(Color.green.opacity(0.15)))
-                    .foregroundStyle(.green)
-            } else {
-                Text("未配对")
-                    .font(.system(size: 10, weight: .medium))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 1)
-                    .background(Capsule().fill(Color.orange.opacity(0.15)))
-                    .foregroundStyle(.orange)
+            ZStack {
+                Circle()
+                    .fill(selected ? Color.accentColor.opacity(0.18) : Color.primary.opacity(0.07))
+                Image(systemName: "desktopcomputer")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(selected ? Color.accentColor : Color.secondary)
             }
-            Spacer(minLength: 6)
-            Text("在线")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            .frame(width: 30, height: 30)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(peer.name)
+                    .font(.callout.weight(selected ? .semibold : .regular))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 5, height: 5)
+                    Text("在线")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text(paired ? "· 已配对" : "· 未配对")
+                        .font(.caption2)
+                        .foregroundStyle(paired ? Color.green : Color.orange)
+                }
+            }
+
+            Spacer(minLength: 0)
+
             if !paired {
-                Button("配对…") { beginPairing(peer) }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+                Button("配对") { beginPairing(peer) }
+                    .buttonStyle(.borderless)
+                    .font(.caption)
+                    .foregroundStyle(Color.accentColor)
                     .disabled(model.busy)
                     .help("输入对方屏幕上显示的 6 位配对码")
             }
         }
-        .padding(.vertical, 5)
+        .padding(.vertical, 6)
         .padding(.horizontal, 8)
         .contentShape(Rectangle())
         .onTapGesture { model.selectedPeerID = peer.id }
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(selected ? Color.accentColor.opacity(0.08) : Color.primary.opacity(0.03))
+                .fill(selected ? Color.accentColor.opacity(0.10) : Color.clear)
         )
         .contextMenu {
             Button("选中这台设备") { model.selectedPeerID = peer.id }
+            Button("配对…") { beginPairing(peer) }
             if paired {
                 Button("取消与「\(peer.name)」的配对") { model.forget(peer) }
             }
         }
     }
 
-    // MARK: - 发送
-
-    private var targetDetail: some View {
-        Group {
-            if let peer = selectedPeer {
-                HStack(spacing: 4) {
-                    Text("发给 \(peer.name)")
-                    if !model.isPaired(peer.id) {
-                        Text("· 首次发送需输入对方配对码")
-                            .foregroundStyle(.orange)
-                    }
-                }
-            } else {
-                Text("先选择上面的设备")
-            }
-        }
-        .font(.caption)
-        .foregroundStyle(.secondary)
-    }
-
-    private var sendTextCard: some View {
+    private var localDeviceCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Text("发送文字")
+            HStack(spacing: 5) {
+                Text("本机")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
-                Spacer()
-                targetDetail
-            }
-
-            HStack(spacing: 8) {
-                TextField("输入要发给对方的文字", text: $textDraft)
-                    .textFieldStyle(.plain)
-                    .padding(.vertical, 7)
-                    .padding(.horizontal, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color(nsColor: .textBackgroundColor))
-                    )
-                    .onSubmit { sendText() }
-
-                Button {
-                    sendText()
-                } label: {
-                    Label("发送文字", systemImage: "paperplane.fill")
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(model.busy || selectedPeer == nil
-                          || textDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-        }
-        .padding(12)
-        .background(cardFill)
-        .overlay(cardStroke)
-    }
-
-    private var sendFileCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Text("发送文件")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                targetDetail
-            }
-
-            fileDropZone
-
-            if !stagedFiles.isEmpty {
-                VStack(spacing: 3) {
-                    ForEach(stagedFiles, id: \.self) { url in
-                        stagedFileRow(url)
-                    }
-                }
-
-                HStack(spacing: 8) {
-                    Text(stagedFiles.count == 1
-                         ? "1 个文件待发送"
-                         : "\(stagedFiles.count) 个文件待发送")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button("清空") { stagedFiles.removeAll() }
-                        .buttonStyle(.borderless)
-                        .font(.caption)
-                        .disabled(model.busy)
-                    Button {
-                        sendStagedFiles()
-                    } label: {
-                        Label(stagedFiles.count == 1
-                              ? "发送文件"
-                              : "发送 \(stagedFiles.count) 个文件",
-                              systemImage: "paperplane.fill")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(model.busy || selectedPeer == nil)
-                }
-            }
-        }
-        .padding(12)
-        .background(cardFill)
-        .overlay(cardStroke)
-    }
-
-    private func stagedFileRow(_ url: URL) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "doc.fill")
-                .foregroundStyle(.secondary)
-                .frame(width: 16)
-            Text(url.lastPathComponent)
-                .font(.callout)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Text(fileSizeText(url))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 6)
-            Button {
-                removeStaged([url])
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-            }
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
-            .help("从待发送列表移除")
-            .disabled(model.busy)
-        }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(Color.primary.opacity(0.03))
-        )
-    }
-
-    private var sendProgressRow: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ProgressView(value: model.sendProgress)
-                .controlSize(.small)
-            Text("正在发送 \(model.activeSendLabel)…")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 2)
-    }
-
-    private var fileDropZone: some View {
-        HStack(spacing: 10) {
-            Image(systemName: isFileDropTarget ? "arrow.down.doc.fill" : "arrow.up.doc")
-                .font(.system(size: 20, weight: .light))
-                .foregroundStyle(isFileDropTarget ? Color.accentColor : Color.secondary)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(isFileDropTarget ? "松开后加入待发送列表" : "把文件拖到这里，选好后再点发送")
-                    .font(.callout)
-                Text("也可以点这里选择文件，支持一次多个")
+                Text(model.deviceName)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 0)
-            Button("选择文件…") { chooseFiles() }
-                .disabled(model.busy)
-        }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(isFileDropTarget ? Color.accentColor.opacity(0.08) : Color.primary.opacity(0.03))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(style: StrokeStyle(lineWidth: 1.4, dash: [6, 5]))
-                .foregroundStyle(isFileDropTarget ? Color.accentColor : Color.primary.opacity(0.18))
-        )
-        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .onTapGesture { chooseFiles() }
-        .onDrop(of: [UTType.fileURL.identifier], isTargeted: $isFileDropTarget) { providers in
-            handleDrop(providers)
-        }
-        .disabled(model.busy)
-    }
-
-    // MARK: - 消息记录（聊天式）
-
-    private var messagesCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Text("消息")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                if !model.messages.isEmpty {
-                    Text("\(model.messages.count) 条")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-                Spacer()
-                if !model.messages.isEmpty {
-                    Button("清空记录") { showClearConfirm = true }
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                if model.pairedCount > 0 {
+                    Button("清除配对") { model.forgetPairs() }
                         .buttonStyle(.borderless)
-                        .font(.caption)
+                        .font(.caption2)
                 }
             }
 
-            if model.messages.isEmpty {
-                HStack(spacing: 9) {
-                    Image(systemName: "bubble.left.and.bubble.right")
-                        .font(.system(size: 18, weight: .light))
+            HStack(alignment: .center, spacing: 6) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("你的配对码")
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("还没有消息")
-                            .font(.callout)
-                        Text("收到的文字和文件会像聊天一样显示在这里，发出去的内容也会留在上面")
-                            .font(.caption)
+                    Text(model.pairingCode.map(String.init).joined(separator: " "))
+                        .font(.system(size: 19, weight: .semibold, design: .monospaced))
+                        .textSelection(.enabled)
+                }
+                Spacer(minLength: 0)
+                Button {
+                    copyPairingCode()
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .help("复制配对码")
+                Button {
+                    model.regenerateCode()
+                } label: {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .help("换一个配对码")
+            }
+
+            HStack(spacing: 5) {
+                Image(systemName: "tray.and.arrow.down")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text(model.receiveDir)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .textSelection(.enabled)
+                    .help(model.receiveDir)
+                Spacer(minLength: 2)
+                Button {
+                    model.chooseReceiveDir()
+                } label: {
+                    Text("修改").font(.caption2)
+                }
+                .buttonStyle(.borderless)
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: model.receiveDir)])
+                } label: {
+                    Image(systemName: "folder").font(.caption2)
+                }
+                .buttonStyle(.borderless)
+                .help("在访达中打开接收目录")
+            }
+
+            if let name = model.pendingPairName {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "person.crop.circle.badge.questionmark")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("「\(name)」请求配对")
+                            .font(.caption.weight(.medium))
+                        Text("把本机配对码 \(model.pairingCode) 告诉对方")
+                            .font(.caption2)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    Spacer(minLength: 0)
-                }
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(spacing: 10) {
-                            ForEach(model.messages) { message in
-                                messageRow(message)
-                                    .id(message.id)
-                            }
-                        }
-                        .padding(.vertical, 2)
-                        .padding(.horizontal, 2)
-                    }
-                    .frame(height: 230)
-                    .onAppear {
-                        if let last = model.messages.last {
-                            proxy.scrollTo(last.id, anchor: .bottom)
-                        }
-                    }
-                    .onChange(of: model.messages.count) { _ in
-                        if let last = model.messages.last {
-                            withAnimation(.easeOut(duration: 0.18)) {
-                                proxy.scrollTo(last.id, anchor: .bottom)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        .padding(12)
-        .background(cardFill)
-        .overlay(cardStroke)
-        .alert("清空全部消息记录？", isPresented: $showClearConfirm) {
-            Button("取消", role: .cancel) {}
-            Button("清空", role: .destructive) { model.clearMessages() }
-        } message: {
-            Text("只清空这里的聊天列表，已经收到的文件不会被删除。")
-        }
-    }
-
-    private func messageRow(_ message: LANMessage) -> some View {
-        let outgoing = message.direction == .outgoing
-        return HStack(alignment: .top, spacing: 8) {
-            if outgoing { Spacer(minLength: 48) }
-            VStack(alignment: outgoing ? .trailing : .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(outgoing ? "我 → \(message.peerName)" : message.peerName)
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.secondary)
-                    Text(message.date.formatted(date: .omitted, time: .shortened))
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                    if message.kind == .text {
-                        Button {
-                            model.copyText(message)
-                        } label: {
-                            Image(systemName: "doc.on.doc")
-                                .font(.caption2)
-                        }
+                    Spacer(minLength: 2)
+                    Button("知道了") { model.clearPendingPair() }
                         .buttonStyle(.borderless)
-                        .foregroundStyle(.tertiary)
-                        .help("复制这段文字")
-                    }
+                        .font(.caption2)
                 }
-                bubble(for: message)
-            }
-            if !outgoing { Spacer(minLength: 48) }
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    @ViewBuilder
-    private func bubble(for message: LANMessage) -> some View {
-        let outgoing = message.direction == .outgoing
-        let fill = outgoing
-            ? Color.accentColor.opacity(0.14)
-            : Color.primary.opacity(0.06)
-
-        if message.kind == .text {
-            Text(message.text ?? "")
-                .font(.callout)
-                .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
+                .padding(6)
                 .background(
-                    RoundedRectangle(cornerRadius: 11, style: .continuous).fill(fill)
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Color.orange.opacity(0.10))
                 )
-                .contextMenu {
-                    Button("复制文字") { model.copyText(message) }
-                }
-        } else {
-            HStack(spacing: 9) {
-                Image(systemName: "doc.fill")
-                    .font(.title3)
-                    .foregroundStyle(outgoing ? Color.accentColor : Color.secondary)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(message.fileName ?? "文件")
-                        .font(.callout)
-                        .lineLimit(2)
-                        .truncationMode(.middle)
-                    HStack(spacing: 6) {
-                        if let size = message.fileSize, size > 0 {
-                            Text(ByteCountFormatter.string(fromByteCount: Int64(size),
-                                                           countStyle: .file))
-                        }
-                        Text(outgoing ? "已发送" : "已保存")
-                    }
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 6)
-                Button(outgoing ? "打开" : "显示") {
-                    model.revealFile(message)
-                }
-                .buttonStyle(.borderless)
-                .font(.caption)
-                .help(message.filePath ?? "")
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 11, style: .continuous).fill(fill)
-            )
-            .contextMenu {
-                Button("在访达中显示") { model.revealFile(message) }
             }
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 
-    private func fileSizeText(_ url: URL) -> String {
-        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
-        let size = (attributes?[.size] as? NSNumber)?.intValue ?? 0
-        return ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)
-    }
-
-    // MARK: - 状态 / 底部
-
-    private var statusLine: some View {
-        HStack(alignment: .top, spacing: 6) {
+    private var statusStrip: some View {
+        HStack(alignment: .top, spacing: 5) {
             Image(systemName: statusSymbol)
+                .font(.caption2)
                 .foregroundStyle(statusColor)
             Text(model.statusText)
-                .font(.callout)
+                .font(.caption2)
                 .foregroundStyle(model.statusKind == .failure ? Color.red : Color.secondary)
                 .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
-                .help(model.statusText)
+            Spacer(minLength: 0)
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 2)
+        .background(Color.primary.opacity(0.03))
     }
 
     private var statusSymbol: String {
@@ -645,15 +349,499 @@ struct LANTransferView: View {
         }
     }
 
-    private var footer: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "lock.shield")
-                .font(.caption)
-            Text("文字和文件在两台设备之间直连传输，不经过服务器；点设备旁的「配对…」输入对方配对码即可")
-                .font(.caption)
-            Spacer(minLength: 0)
+    // MARK: - 右侧聊天区
+
+    private var chatPane: some View {
+        VStack(spacing: 0) {
+            chatHeader
+            Divider()
+            messageList
+            Divider()
+            composer
         }
-        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .textBackgroundColor))
+        .overlay(alignment: .center) {
+            if isFileDropTarget {
+                dropOverlay
+            }
+        }
+        .onDrop(of: [UTType.fileURL.identifier], isTargeted: $isFileDropTarget) { providers in
+            handleDrop(providers)
+        }
+        .alert("清空全部消息记录？", isPresented: $showClearConfirm) {
+            Button("取消", role: .cancel) {}
+            Button("清空", role: .destructive) { model.clearMessages() }
+        } message: {
+            Text("只清空这里的聊天列表，已经收到的文件不会被删除。")
+        }
+    }
+
+    private var chatHeader: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(Color.accentColor.opacity(0.15))
+                Image(systemName: selectedPeer == nil ? "arrow.left.arrow.right" : "desktopcomputer")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Color.accentColor)
+            }
+            .frame(width: 38, height: 38)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(selectedPeer?.name ?? "文件传输")
+                    .font(.headline)
+                    .lineLimit(1)
+                Text(headerSubtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            if let peer = selectedPeer, !selectedPeerPaired {
+                Button {
+                    beginPairing(peer)
+                } label: {
+                    Label("配对…", systemImage: "key.horizontal")
+                }
+                .controlSize(.small)
+                .disabled(model.busy)
+                .help("输入对方屏幕上显示的 6 位配对码")
+            }
+
+            Menu {
+                Button("清空聊天记录…") { showClearConfirm = true }
+                    .disabled(model.messages.isEmpty)
+                Divider()
+                Button("修改接收目录…") { model.chooseReceiveDir() }
+                Button("在访达中打开接收目录") {
+                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: model.receiveDir)])
+                }
+                Divider()
+                Button("复制本机配对码") { copyPairingCode() }
+                Button("换一个配对码") { model.regenerateCode() }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.secondary)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .frame(width: 30)
+            .help("更多")
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var headerSubtitle: String {
+        guard selectedPeer != nil else {
+            return model.messages.isEmpty ? "在左侧选择设备，开始像聊天一样互传" : "共 \(model.messages.count) 条记录 · 在左侧选择发送目标"
+        }
+        if selectedPeerPaired {
+            return "在线 · 已配对，可直接发送文字和文件"
+        }
+        return "在线 · 未配对，首次发送需要输入对方配对码"
+    }
+
+    private var dropOverlay: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "arrow.down.doc.fill")
+                .font(.system(size: 30, weight: .light))
+            Text("松开，把文件加入待发送列表")
+                .font(.headline)
+            Text("选好后再点「发送文件」")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(28)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(nsColor: .windowBackgroundColor).opacity(0.94))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 1.6, dash: [7, 5]))
+        )
+        .shadow(radius: 12, y: 4)
+    }
+
+    // MARK: - 消息列表
+
+    private var messageList: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                if model.messages.isEmpty {
+                    emptyChatHint
+                } else {
+                    LazyVStack(alignment: .leading, spacing: 14) {
+                        ForEach(model.messages) { message in
+                            messageRow(message)
+                                .id(message.id)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                }
+            }
+            .onAppear { scrollToBottom(proxy, animated: false) }
+            .onChange(of: model.messages.count) { _ in
+                scrollToBottom(proxy, animated: true)
+            }
+            .onChange(of: model.selectedPeerID) { _ in
+                scrollToBottom(proxy, animated: false)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func scrollToBottom(_ proxy: ScrollViewProxy, animated: Bool) {
+        guard let last = model.messages.last else { return }
+        if animated {
+            withAnimation(.easeOut(duration: 0.18)) {
+                proxy.scrollTo(last.id, anchor: .bottom)
+            }
+        } else {
+            proxy.scrollTo(last.id, anchor: .bottom)
+        }
+    }
+
+    private var emptyChatHint: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "bubble.left.and.bubble.right")
+                .font(.system(size: 34, weight: .light))
+                .foregroundStyle(.tertiary)
+            Text("还没有消息")
+                .font(.title3.weight(.medium))
+                .foregroundStyle(.secondary)
+            Text("收到的文字和文件会像聊天一样显示在这里，\n发出去的内容也会留在上面。")
+                .font(.callout)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 110)
+        .padding(.horizontal, 24)
+    }
+
+    private func messageRow(_ message: LANMessage) -> some View {
+        let outgoing = message.direction == .outgoing
+        return HStack(alignment: .top, spacing: 8) {
+            if outgoing {
+                Spacer(minLength: 30)
+            } else {
+                bubbleAvatar(systemName: "desktopcomputer", outgoing: false, peerName: message.peerName)
+            }
+
+            VStack(alignment: outgoing ? .trailing : .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    if outgoing {
+                        Text(message.date.formatted(date: .omitted, time: .shortened))
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        Text("我 → \(message.peerName)")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    } else {
+                        Text(message.peerName)
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.secondary)
+                        Text(message.date.formatted(date: .omitted, time: .shortened))
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        if message.kind == .text {
+                            Button {
+                                model.copyText(message)
+                            } label: {
+                                Image(systemName: "doc.on.doc").font(.caption2)
+                            }
+                            .buttonStyle(.borderless)
+                            .foregroundStyle(.tertiary)
+                            .help("复制这段文字")
+                        }
+                    }
+                    if outgoing && message.kind == .text {
+                        Button {
+                            model.copyText(message)
+                        } label: {
+                            Image(systemName: "doc.on.doc").font(.caption2)
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.tertiary)
+                        .help("复制这段文字")
+                    }
+                }
+                bubble(for: message)
+            }
+
+            if outgoing {
+                bubbleAvatar(systemName: "person.fill", outgoing: true, peerName: nil)
+            } else {
+                Spacer(minLength: 30)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: outgoing ? .trailing : .leading)
+    }
+
+    private func bubbleAvatar(systemName: String, outgoing: Bool, peerName: String?) -> some View {
+        ZStack {
+            Circle()
+                .fill(outgoing ? Color.accentColor.opacity(0.18) : Color.primary.opacity(0.08))
+            Image(systemName: systemName)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(outgoing ? Color.accentColor : Color.secondary)
+        }
+        .frame(width: 30, height: 30)
+        .help(peerName ?? "我")
+    }
+
+    @ViewBuilder
+    private func bubble(for message: LANMessage) -> some View {
+        let outgoing = message.direction == .outgoing
+        let fill = outgoing
+            ? Color.accentColor.opacity(0.15)
+            : Color.primary.opacity(0.055)
+        let radius: CGFloat = 11
+
+        if message.kind == .text {
+            Text(message.text ?? "")
+                .font(.callout)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: radius, style: .continuous).fill(fill)
+                )
+                .contextMenu {
+                    Button("复制文字") { model.copyText(message) }
+                }
+        } else {
+            HStack(spacing: 9) {
+                Image(systemName: "doc.fill")
+                    .font(.title3)
+                    .foregroundStyle(outgoing ? Color.accentColor : Color.secondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(message.fileName ?? "文件")
+                        .font(.callout)
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                    HStack(spacing: 6) {
+                        if let size = message.fileSize, size > 0 {
+                            Text(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))
+                        }
+                        Text(outgoing ? "已发送" : "已保存")
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 4)
+                Button(outgoing ? "打开" : "显示") {
+                    model.revealFile(message)
+                }
+                .buttonStyle(.borderless)
+                .font(.caption)
+                .help(message.filePath ?? "")
+            }
+            .frame(maxWidth: 360, alignment: .leading)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 9)
+            .background(
+                RoundedRectangle(cornerRadius: radius, style: .continuous).fill(fill)
+            )
+            .contextMenu {
+                Button("在访达中显示") { model.revealFile(message) }
+            }
+        }
+    }
+
+    // MARK: - 底部输入区
+
+    private var composer: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if model.busy {
+                HStack(spacing: 8) {
+                    ProgressView(value: model.sendProgress)
+                        .controlSize(.small)
+                    Text("正在发送 \(model.activeSendLabel)…")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 2)
+            }
+
+            if !stagedFiles.isEmpty {
+                stagedFileBar
+            }
+
+            HStack(alignment: .bottom, spacing: 8) {
+                Button {
+                    chooseFiles()
+                } label: {
+                    Image(systemName: "paperclip")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(selectedPeer == nil || model.busy ? Color.secondary : Color.primary)
+                        .frame(width: 30, height: 30)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(Color.primary.opacity(0.05))
+                        )
+                }
+                .buttonStyle(.plain)
+                .help("选择要发送的文件")
+                .disabled(selectedPeer == nil || model.busy)
+
+                TextField(composerPlaceholder, text: $textDraft)
+                    .textFieldStyle(.plain)
+                    .font(.callout)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 11)
+                    .background(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .fill(Color(nsColor: .textBackgroundColor).opacity(0.6))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.07))
+                    )
+                    .focused($composerFocused)
+                    .onSubmit { sendText() }
+                    .disabled(selectedPeer == nil)
+
+                Button {
+                    sendText()
+                } label: {
+                    Image(systemName: "paperplane.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(canSendText ? Color.white : Color.secondary)
+                        .frame(width: 34, height: 34)
+                        .background(
+                            Circle().fill(canSendText ? Color.accentColor : Color.primary.opacity(0.06))
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(!canSendText)
+                .help("发送文字（Enter）")
+            }
+
+            HStack(spacing: 5) {
+                Text(targetHint)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 4)
+                Text("Enter 发送 · 可拖拽文件")
+            }
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+            .padding(.horizontal, 2)
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 10)
+        .padding(.bottom, 12)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var composerPlaceholder: String {
+        guard let peer = selectedPeer else { return "先在左侧选择设备" }
+        return "发送给 \(peer.name)…"
+    }
+
+    private var canSendText: Bool {
+        selectedPeer != nil
+            && !model.busy
+            && !textDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var targetHint: String {
+        guard let peer = selectedPeer else {
+            return "未选择设备"
+        }
+        if selectedPeerPaired {
+            return "发给 \(peer.name) · 已配对"
+        }
+        return "发给 \(peer.name) · 首次发送需输入对方配对码"
+    }
+
+    private var stagedFileBar: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(stagedFiles, id: \.self) { url in
+                        stagedFileChip(url)
+                    }
+                }
+                .padding(.vertical, 1)
+            }
+
+            HStack(spacing: 8) {
+                Text(stagedFiles.count == 1 ? "1 个文件待发送" : "\(stagedFiles.count) 个文件待发送")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 4)
+                Button("清空") { stagedFiles.removeAll() }
+                    .buttonStyle(.borderless)
+                    .font(.caption2)
+                    .disabled(model.busy)
+                Button {
+                    sendStagedFiles()
+                } label: {
+                    Label(stagedFiles.count == 1 ? "发送文件" : "发送 \(stagedFiles.count) 个文件",
+                          systemImage: "paperplane.fill")
+                        .font(.caption)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .disabled(model.busy || selectedPeer == nil)
+            }
+        }
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(Color.primary.opacity(0.035))
+        )
+    }
+
+    private func stagedFileChip(_ url: URL) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: "doc.fill")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(url.lastPathComponent)
+                .font(.caption)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: 150, alignment: .leading)
+            Text(fileSizeText(url))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Button {
+                removeStaged([url])
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.borderless)
+            .help("从待发送列表移除")
+            .disabled(model.busy)
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 8)
+        .background(
+            Capsule()
+                .fill(Color.primary.opacity(0.055))
+        )
+    }
+
+    private func fileSizeText(_ url: URL) -> String {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        let size = (attributes?[.size] as? NSNumber)?.intValue ?? 0
+        return ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)
     }
 
     // MARK: - 发送操作
@@ -668,10 +856,11 @@ struct LANTransferView: View {
     private func sendText() {
         guard let peer = selectedPeer else {
             model.statusKind = .failure
-            model.statusText = "先在「附近设备」里选中对方"
+            model.statusText = "先在左侧选中对方设备"
             return
         }
         let value = textDraft
+        guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         model.sendText(value, to: peer, code: nil) { outcome in
             switch outcome {
             case .ok:
@@ -695,7 +884,7 @@ struct LANTransferView: View {
         guard !urls.isEmpty else { return }
         guard let peer = selectedPeer else {
             model.statusKind = .failure
-            model.statusText = "先在「附近设备」里选中对方"
+            model.statusText = "先在左侧选中对方设备"
             return
         }
         model.sendFiles(urls, to: peer, code: nil) { outcome in
@@ -727,6 +916,63 @@ struct LANTransferView: View {
         let paths = Set(urls.map { $0.standardizedFileURL.path })
         stagedFiles.removeAll { paths.contains($0.standardizedFileURL.path) }
     }
+
+    private func copyPairingCode() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(model.pairingCode, forType: .string)
+        model.statusKind = .success
+        model.statusText = "已复制本机配对码 \(model.pairingCode)"
+    }
+
+    private func chooseFiles() {
+        guard !model.busy, selectedPeer != nil else { return }
+        let panel = NSOpenPanel()
+        panel.title = "选择要发送的文件"
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = true
+        panel.directoryURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+        if panel.runModal() == .OK {
+            addStagedFiles(panel.urls)
+        }
+    }
+
+    private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
+        guard !model.busy, selectedPeer != nil else { return false }
+        let group = DispatchGroup()
+        let lock = NSLock()
+        var urls: [URL] = []
+        var accepted = false
+
+        for provider in providers where provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+            accepted = true
+            group.enter()
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+                var url: URL?
+                if let data = item as? Data {
+                    url = URL(dataRepresentation: data, relativeTo: nil)
+                } else if let nsURL = item as? NSURL {
+                    url = nsURL as URL
+                } else if let direct = item as? URL {
+                    url = direct
+                }
+                if let url {
+                    lock.lock()
+                    urls.append(url)
+                    lock.unlock()
+                }
+                group.leave()
+            }
+        }
+
+        guard accepted else { return false }
+        group.notify(queue: .main) {
+            addStagedFiles(urls)
+        }
+        return true
+    }
+
+    // MARK: - 配对面板
 
     private func confirmPairing() {
         guard let request = pairing else { return }
@@ -766,8 +1012,6 @@ struct LANTransferView: View {
             model.sendFiles(urls, to: request.peer, code: code, completion: retry)
         }
     }
-
-    // MARK: - 配对面板
 
     private func pairingSheet(_ request: PairingRequest) -> some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -831,7 +1075,7 @@ struct LANTransferView: View {
             }
         }
         .padding(22)
-        .frame(width: 420)
+        .frame(width: 430)
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 codeFocused = true
@@ -843,9 +1087,9 @@ struct LANTransferView: View {
     private func pairingHelp(for request: PairingRequest) -> String {
         switch request.action {
         case .pair:
-            return "在对方电脑的 ADBType「电脑设备」页顶部，可以看到 6 位配对码。输入一次后两台设备会互相信任，以后直接发送；也可以直接粘贴。"
+            return "在对方电脑的 ADBType「电脑设备」页左侧，可以看到 6 位配对码。输入一次后两台设备会互相信任，以后直接发送；也可以直接粘贴。"
         case .text, .files:
-            return "这是第一次和「\(request.peerName)」互传。在对方电脑的「电脑设备」页顶部找到 6 位配对码，输入后会把这次内容发过去，并记住对方。"
+            return "这是第一次和「\(request.peerName)」互传。在对方电脑的「电脑设备」页左侧找到 6 位配对码，输入后会把这次内容发过去，并记住对方。"
         }
     }
 
@@ -860,55 +1104,5 @@ struct LANTransferView: View {
         if !digits.isEmpty {
             codeInput = digits
         }
-    }
-
-    // MARK: - 选择 / 拖拽
-
-    private func chooseFiles() {
-        guard !model.busy else { return }
-        let panel = NSOpenPanel()
-        panel.title = "选择要发送的文件"
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = true
-        panel.directoryURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
-        if panel.runModal() == .OK {
-            addStagedFiles(panel.urls)
-        }
-    }
-
-    private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
-        guard !model.busy else { return false }
-        let group = DispatchGroup()
-        let lock = NSLock()
-        var urls: [URL] = []
-        var accepted = false
-
-        for provider in providers where provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
-            accepted = true
-            group.enter()
-            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
-                var url: URL?
-                if let data = item as? Data {
-                    url = URL(dataRepresentation: data, relativeTo: nil)
-                } else if let nsURL = item as? NSURL {
-                    url = nsURL as URL
-                } else if let direct = item as? URL {
-                    url = direct
-                }
-                if let url {
-                    lock.lock()
-                    urls.append(url)
-                    lock.unlock()
-                }
-                group.leave()
-            }
-        }
-
-        guard accepted else { return false }
-        group.notify(queue: .main) {
-            addStagedFiles(urls)
-        }
-        return true
     }
 }
