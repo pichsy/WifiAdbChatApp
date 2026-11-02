@@ -1,7 +1,8 @@
-# 协议与界面联调工具
+# macOS 端协议与界面联调工具
 
 这些脚本用来在没有 UI 自动化的情况下验证「电脑设备」页的局域网协议，以及离屏检查聊天界面。
-它们复用 macOS 端真实的 `LANModel`（`Sources/LANTransfer.swift`），不是另写一份模拟实现。
+它们复用 macOS 端真实的 `LANModel`（[`Sources/LANTransfer.swift`](../Sources/LANTransfer.swift)），
+不是另写一份模拟实现。
 
 ## 文件
 
@@ -17,17 +18,19 @@
 
 ## 使用
 
+在**仓库根目录**执行：
+
 ```bash
-tests/build.sh
+bash macos/tests/build.sh
 
 # 只测 macOS 接收
-bash tests/run_mac_receive_test.sh
+bash macos/tests/run_mac_receive_test.sh
 
 # Windows Core 接收（需要先 dotnet build 冒烟测试项目）
-bash tests/run_interop_windows_receive.sh
+bash macos/tests/run_interop_windows_receive.sh
 
 # Windows Core 发送 → macOS 接收（需要先 dotnet build TestPeer）
-bash tests/run_interop_mac_receive.sh
+bash macos/tests/run_interop_mac_receive.sh
 ```
 
 `lan_probe` 直接使用真实数据目录（`~/Library/Application Support/ADBType/`），
@@ -36,7 +39,7 @@ Windows Core 的数据目录通过 `--data-dir` 指到 `/tmp`，不会碰 macOS 
 
 ## 说明
 
-- Windows 端的 TestPeer 和冒烟测试构建方式见 `windows/README.md`：
+- Windows 端的 TestPeer 和冒烟测试构建方式见 [`windows/README.md`](../../windows/README.md)：
   ```bash
   dotnet build windows/src/ADBTypeLink.SmokeTest/ADBTypeLink.SmokeTest.csproj -c Release
   dotnet build windows/src/ADBTypeLink.TestPeer/ADBTypeLink.TestPeer.csproj -c Release

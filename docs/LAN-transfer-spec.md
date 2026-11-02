@@ -1,6 +1,6 @@
 # ADBType 局域网传输协议 & 界面规格
 
-本文档是 macOS 端（SwiftUI，`Sources/LANTransfer.swift`）与 Windows 端（Avalonia + .NET 8，`windows/`）之间的**兼容契约**。
+本文档是 macOS 端（SwiftUI，`macos/Sources/LANTransfer.swift`）、Windows 端（Avalonia + .NET 8，`windows/`）以及规划中的移动端（`mobile/`）之间的**兼容契约**。
 两端必须严格按本文实现，才能互相发现、配对、收发。
 
 ---

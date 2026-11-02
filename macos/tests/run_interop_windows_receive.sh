@@ -10,7 +10,7 @@ WORK=$(mktemp -d /tmp/wincore-recv.XXXXXX)
 head -c 1500000 /dev/urandom > /tmp/interop-file.bin
 
 DOTNET="$HOME/.dotnet/dotnet"
-( cd windows && "$DOTNET" run --project src/ADBTypeLink.SmokeTest/ADBTypeLink.SmokeTest.csproj -c Release --no-build -- --role=server --data-dir="$WORK/data" --receive-dir="$WORK/recv" > /tmp/wincore.log 2>&1 ) &
+( cd ../windows && "$DOTNET" run --project src/ADBTypeLink.SmokeTest/ADBTypeLink.SmokeTest.csproj -c Release --no-build -- --role=server --data-dir="$WORK/data" --receive-dir="$WORK/recv" > /tmp/wincore.log 2>&1 ) &
 CHILD=$!
 for i in $(seq 1 100); do grep -q '^READY ' /tmp/wincore.log 2>/dev/null && break; sleep 0.2; done
 READY=$(grep '^READY ' /tmp/wincore.log | head -1)

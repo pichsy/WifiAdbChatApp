@@ -1,6 +1,6 @@
 # ADBType 传输端（Windows / Avalonia）
 
-Windows 端的 ADBType 局域网传输应用：和 macOS 端（`Sources/LANTransfer.swift`）按
+Windows 端的 ADBType 局域网传输应用：和 macOS 端（`macos/Sources/LANTransfer.swift`）按
 [`docs/LAN-transfer-spec.md`](../docs/LAN-transfer-spec.md) 的协议**位对位互通**——互相发现、6 位配对码、
 收发文字和文件，界面是微信式的「左边设备列表 + 右边聊天 + 底部固定输入框」。
 

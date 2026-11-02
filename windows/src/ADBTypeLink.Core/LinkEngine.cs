@@ -7,7 +7,7 @@ namespace ADBTypeLink.Core;
 
 /// <summary>
 /// 局域网传输引擎：UDP 发现 + TCP 握手/配对 + 文字/文件收发 + 本机状态持久化。
-/// 协议细节见 docs/LAN-transfer-spec.md，与 macOS 端 Sources/LANTransfer.swift 互通。
+/// 协议细节见 docs/LAN-transfer-spec.md，与 macOS 端 macos/Sources/LANTransfer.swift 互通。
 /// </summary>
 public sealed class LinkEngine : IAsyncDisposable
 {

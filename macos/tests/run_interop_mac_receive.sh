@@ -16,7 +16,7 @@ CODE=$(sed -n 's/.*code=\([0-9][0-9]*\).*/\1/p' /tmp/macprobe.log | head -1)
 echo "MAC CODE=$CODE"
 
 DOTNET="$HOME/.dotnet/dotnet"
-( cd windows && "$DOTNET" run --project src/ADBTypeLink.TestPeer/ADBTypeLink.TestPeer.csproj -c Release --no-build -- \
+( cd ../windows && "$DOTNET" run --project src/ADBTypeLink.TestPeer/ADBTypeLink.TestPeer.csproj -c Release --no-build -- \
     send --peer-name MacProbe --text "你好，这是 Windows core 发来的文字 🚀" \
     --file /tmp/interop2-file.bin --code "$CODE" \
     --data-dir /tmp/winprobe-send-data --name WinProbe --timeout 30 > /tmp/winsend.log 2>&1 )

@@ -1,11 +1,16 @@
-# build outputs
-build/
-dist/
-ADBType.app/
+# macOS 构建产物
+macos/build/
+macos/dist/
+macos/ADBType.app/
+
+# Windows 构建产物
 windows/**/bin/
 windows/**/obj/
 windows/**/publish/
-# macOS
+windows/dist/
+
+# 系统文件
 .DS_Store
-# local test artifacts
+
+# 本地临时测试产物
 /tmp-recv/
