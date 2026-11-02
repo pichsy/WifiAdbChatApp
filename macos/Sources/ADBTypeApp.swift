@@ -19,7 +19,7 @@ struct ADBTypeApp: App {
     @StateObject private var lanModel = LANModel()
 
     var body: some Scene {
-        Window("ADBType 传输", id: "main") {
+        Window("文件互传助手", id: "main") {
             ContentView()
                 .environmentObject(model)
                 .environmentObject(fileModel)

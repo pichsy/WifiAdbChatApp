@@ -1,4 +1,4 @@
-# ADBType · 局域网互传（macOS / Windows / 移动端规划）
+# 文件互传助手 · 局域网互传（macOS / Windows / 移动端规划）
 
 一套局域网直连的小工具，按端分成独立目录，互不交叉：
 
@@ -8,6 +8,9 @@
 
 电脑之间**直连传输，不经过服务器**：UDP 52730 发现设备，6 位配对码配对，之后用 TCP 收发
 文字和文件；聊天记录、配对关系本地持久化。
+
+> 改名说明：App 的显示名称统一为「文件互传助手」。内部 Bundle ID、可执行文件名和协议广播
+> 标识仍是 `ADBType` / `ADBTypeLink`，不影响与旧版本或其他端互传，已有配对和聊天记录继续有效。
 
 ---
 
@@ -20,7 +23,7 @@
 │  ├─ Resources/          Info.plist、图标、手机剪贴板 dex
 │  ├─ packaging/          分发用安装说明与安装脚本
 │  ├─ tests/              协议探针 / 界面离屏渲染 / 互通测试
-│  ├─ build.sh            编译出 ADBType.app
+│  ├─ build.sh            编译出「文件互传助手.app」
 │  └─ package.sh          生成 dmg / zip
 ├─ windows/               Windows 端（Avalonia + .NET 8）
 │  ├─ src/                Core、App、SmokeTest、TestPeer
@@ -57,7 +60,7 @@
 ```bash
 cd macos
 ./build.sh          # 需要 Xcode 命令行工具；默认 arm64 + x86_64
-open ADBType.app
+open 文件互传助手.app
 ```
 
 **Windows**（在 Windows 上执行）

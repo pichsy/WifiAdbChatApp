@@ -1,10 +1,11 @@
 #!/bin/bash
-# 编译并打包 ADBType.app（原生 SwiftUI，无第三方依赖）
+# 编译并打包「文件互传助手.app」（原生 SwiftUI，无第三方依赖）
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APP_NAME="ADBType"
-APP="${APP_NAME}.app"
+BUNDLE_NAME="文件互传助手"
+EXECUTABLE="ADBType"
+APP="${BUNDLE_NAME}.app"
 SDK=$(xcrun --sdk macosx --show-sdk-path)
 ARCHS="${ARCHS:-arm64 x86_64}"
 
@@ -14,7 +15,7 @@ mkdir -p build "$APP/Contents/MacOS" "$APP/Contents/Resources"
 echo "==> 编译 (${ARCHS}, macOS 13+)"
 BINARIES=()
 for arch in $ARCHS; do
-    out="build/${APP_NAME}-${arch}"
+    out="build/${EXECUTABLE}-${arch}"
     swiftc -O \
         -swift-version 5 \
         -target "${arch}-apple-macos13.0" \
@@ -26,13 +27,13 @@ for arch in $ARCHS; do
 done
 
 if [ "${#BINARIES[@]}" -eq 1 ]; then
-    cp "${BINARIES[0]}" "build/${APP_NAME}"
+    cp "${BINARIES[0]}" "build/${EXECUTABLE}"
 else
-    lipo -create "${BINARIES[@]}" -output "build/${APP_NAME}"
+    lipo -create "${BINARIES[@]}" -output "build/${EXECUTABLE}"
 fi
 
 echo "==> 组装 app bundle"
-cp "build/${APP_NAME}" "$APP/Contents/MacOS/${APP_NAME}"
+cp "build/${EXECUTABLE}" "$APP/Contents/MacOS/${EXECUTABLE}"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 if [ -f Resources/AppIcon.icns ]; then
     cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"

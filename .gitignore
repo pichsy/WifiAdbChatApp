@@ -1,7 +1,7 @@
 # macOS 构建产物
 macos/build/
 macos/dist/
-macos/ADBType.app/
+macos/*.app/
 
 # Windows 构建产物
 windows/**/bin/

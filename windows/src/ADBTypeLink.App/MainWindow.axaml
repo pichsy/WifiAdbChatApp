@@ -1,7 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="ADBTypeLink.App.MainWindow"
-        Title="ADBType 传输"
+        Title="文件互传助手"
         Width="1120" Height="740"
         MinWidth="900" MinHeight="620"
         WindowStartupLocation="CenterScreen"
@@ -17,7 +17,7 @@
       <Grid RowDefinitions="Auto,*,Auto">
 
         <StackPanel Grid.Row="0" Margin="16,14,16,6" Spacing="2">
-          <TextBlock Text="ADBType 传输"
+          <TextBlock Text="文件互传助手"
                      FontSize="17" FontWeight="SemiBold"
                      Foreground="{DynamicResource TextPrimaryBrush}" />
           <TextBlock Text="局域网直连 · 像聊天一样传文字和文件"
@@ -78,7 +78,7 @@
               <StackPanel Spacing="2">
                 <TextBlock Text="正在搜索…" FontSize="12.5" FontWeight="SemiBold"
                            Foreground="{DynamicResource TextSecondaryBrush}" />
-                <TextBlock Text="在另一台电脑上打开 ADBType 传输端，并连同一个局域网"
+                <TextBlock Text="在另一台电脑上打开「文件互传助手」，并连同一个局域网"
                            FontSize="11" TextWrapping="Wrap"
                            Foreground="{DynamicResource TextTertiaryBrush}" />
               </StackPanel>

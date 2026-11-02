@@ -1,4 +1,4 @@
-# ADBType · macOS 端
+# 文件互传助手 · macOS 端
 
 macOS 原生 SwiftUI 小工具（macOS 13+，无第三方依赖），包含两个页面：
 
@@ -67,10 +67,10 @@ Windows 端在 [`windows/`](../windows/)；移动端规划见 [`mobile/`](../mob
 ```bash
 cd macos
 ./build.sh          # 需要 Xcode 命令行工具（swiftc），默认编 arm64 + x86_64 通用包
-open ADBType.app
+open 文件互传助手.app
 ```
 
-- 产物 `macos/ADBType.app` 可以直接拖到「应用程序」目录。
+- 产物 `macos/文件互传助手.app` 可以直接拖到「应用程序」目录。
 - 构建目标为 macOS 13+ 通用二进制（Apple 芯片 / Intel 都能跑），本机临时签名。
 - adb 自动查找顺序：已保存的路径 → `ANDROID_HOME` / `ANDROID_SDK_ROOT` → `~/Android/sdk`
   → `~/Library/Android/sdk` → Homebrew → 登录 shell 的 PATH。都找不到时点右下角齿轮手动选择。
@@ -81,7 +81,7 @@ open ADBType.app
 
 ```bash
 cd macos
-./package.sh        # 生成 macos/dist/ADBType-1.2.dmg 和 macos/dist/ADBType-1.2-macOS.zip
+./package.sh        # 生成 macos/dist/文件互传助手-1.2.dmg 和 macos/dist/文件互传助手-1.2-macOS.zip
 ```
 
 - dmg / zip 里带《安装说明.txt》和「授权并安装.sh」（可执行 shell 脚本）：在终端执行
@@ -89,7 +89,7 @@ cd macos
   App（没有管理员权限时会弹窗要密码）。
 - 没有苹果开发者签名和公证（需要付费 Developer ID），手动安装的话第一次打开要：
   右键 →「打开」；若提示「已损坏」，执行
-  `xattr -dr com.apple.quarantine /Applications/ADBType.app`。
+  `xattr -dr com.apple.quarantine /Applications/文件互传助手.app`。
   macOS 15+ 也可在「系统设置 → 隐私与安全性」点「仍要打开」。
 
 ## 已知限制

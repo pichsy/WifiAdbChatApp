@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>zh_CN</string>
 	<key>CFBundleDisplayName</key>
-	<string>ADB 输入</string>
+	<string>文件互传助手</string>
 	<key>CFBundleExecutable</key>
 	<string>ADBType</string>
 	<key>CFBundleIconFile</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>ADBType</string>
+	<string>文件互传助手</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -25,7 +25,7 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>13.0</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>用于在局域网内发现并连接同样运行 ADBType 的设备，直接传输文字和文件。</string>
+	<string>用于在局域网内发现并连接同样运行「文件互传助手」的设备，直接传输文字和文件。</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSPrincipalClass</key>

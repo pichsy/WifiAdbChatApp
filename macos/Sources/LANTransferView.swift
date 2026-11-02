@@ -79,7 +79,7 @@ struct LANTransferView: View {
                 }
                 .frame(width: 26, height: 26)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("ADBType 传输")
+                    Text("文件互传助手")
                         .font(.headline)
                     Text("局域网直连 · 不经过服务器")
                         .font(.caption2)
@@ -144,7 +144,7 @@ struct LANTransferView: View {
                     .font(.callout.weight(.medium))
             }
             .foregroundStyle(.secondary)
-            Text("在另一台 Mac 的「电脑设备」页，或 Windows 电脑上打开 ADBType 传输端，并连同一个 Wi-Fi / 局域网。")
+            Text("在另一台 Mac 的「电脑设备」页，或 Windows 电脑上打开「文件互传助手」，并连同一个 Wi-Fi / 局域网。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1087,7 +1087,7 @@ struct LANTransferView: View {
     private func pairingHelp(for request: PairingRequest) -> String {
         switch request.action {
         case .pair:
-            return "在对方电脑的 ADBType「电脑设备」页左侧，可以看到 6 位配对码。输入一次后两台设备会互相信任，以后直接发送；也可以直接粘贴。"
+            return "在对方电脑的「文件互传助手」→「电脑设备」页左侧，可以看到 6 位配对码。输入一次后两台设备会互相信任，以后直接发送；也可以直接粘贴。"
         case .text, .files:
             return "这是第一次和「\(request.peerName)」互传。在对方电脑的「电脑设备」页左侧找到 6 位配对码，输入后会把这次内容发过去，并记住对方。"
         }

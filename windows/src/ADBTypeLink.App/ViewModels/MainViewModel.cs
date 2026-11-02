@@ -206,7 +206,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     public bool HasSelectedPeer => SelectedPeer is not null;
 
-    public string HeaderTitle => SelectedPeer?.Name ?? "ADBType 传输";
+    public string HeaderTitle => SelectedPeer?.Name ?? "文件互传助手";
 
     public string HeaderStatusText
     {
@@ -770,8 +770,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             Direction = MessageDirection.Outgoing,
             PeerName = "pichs 的 MacBook Pro",
             Kind = MessageKind.File,
-            FileName = "ADBType-link-windows-v1.2.zip",
-            FilePath = @"C:\Users\pichs\Downloads\ADBType 接收\ADBType-link-windows-v1.2.zip",
+            FileName = "文件互传助手-windows-v1.2.zip",
+            FilePath = @"C:\Users\pichs\Downloads\ADBType 接收\文件互传助手-windows-v1.2.zip",
             FileSize = 12_700_000,
             Date = now.AddMinutes(-15),
         }));

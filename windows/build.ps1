@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    ADBType 传输端（Windows）构建脚本：Release 构建 + win-x64 / win-arm64 发布 + 冒烟测试。
+    文件互传助手（Windows）构建脚本：Release 构建 + win-x64 / win-arm64 发布 + 冒烟测试。
 
 .DESCRIPTION
     在 Windows 上构建并发布 Avalonia 桌面端；也支持在安装了 .NET 8 SDK 的其它平台上仅做构建与冒烟测试。

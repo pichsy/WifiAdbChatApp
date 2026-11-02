@@ -34,7 +34,7 @@ struct RenderChatUI {
                        date: now.addingTimeInterval(-320), text: "另外这条是中文和 emoji 测试：😀 收到请回复～"),
             LANMessage(direction: .outgoing, peerName: "pichs 的 Windows 笔记本",
                        date: now.addingTimeInterval(-200),
-                       fileURL: URL(fileURLWithPath: "/Users/pichs/Downloads/ADBType-1.2-macOS.zip"),
+                       fileURL: URL(fileURLWithPath: "/Users/pichs/Downloads/文件互传助手-1.2-macOS.zip"),
                        fileSize: 12_884_901),
             LANMessage(direction: .incoming, peerName: "pichs 的 Windows 笔记本",
                        date: now.addingTimeInterval(-120),
@@ -58,7 +58,7 @@ struct RenderChatUI {
 
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: height),
                               styleMask: [.titled, .resizable], backing: .buffered, defer: false)
-        window.title = "ADBType 传输"
+        window.title = "文件互传助手"
         window.contentView = hosting
         window.center()
         window.makeKeyAndOrderFront(nil)
