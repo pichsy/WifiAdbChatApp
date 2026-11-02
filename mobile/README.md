@@ -54,8 +54,16 @@ macOS / Windows 版「文件互传助手」直接互传：
 ```
 mobile/
 ├─ README.md          # 本文件
+├─ assets/
+│  └─ app-icon.png    # 512×512 图标源图（与电脑端同一套视觉）
 └─ （代码待添加）
 ```
+
+## 图标
+
+- 源图：`assets/app-icon.png`（512×512，蓝底圆角、电脑互传图形）；
+- Android / iOS 工程建立后，再按各平台要求缩放成多尺寸（自适应图标 / Assets.xcassets），
+  电脑端使用同一张源图生成 macOS 的 `.icns` 和 Windows 的 `.ico`。
 
 ## 验收标准（一期）
 
