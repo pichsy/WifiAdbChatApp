@@ -76,6 +76,7 @@ powershell -ExecutionPolicy Bypass -File windows\build.ps1
 - 局域网协议 + 双端界面规格：[`docs/LAN-transfer-spec.md`](docs/LAN-transfer-spec.md)
 - macOS 端构建、打包、使用、限制：[`macos/README.md`](macos/README.md)
 - Windows 端构建、使用、防火墙：[`windows/README.md`](windows/README.md)
+- Windows 真机测试清单：[`windows/TESTING.md`](windows/TESTING.md)
 - macOS 联调工具（探针 / Python 对端 / 互通脚本）：[`macos/tests/README.md`](macos/tests/README.md)
 - 移动端规划：[`mobile/README.md`](mobile/README.md)
 

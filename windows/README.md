@@ -135,6 +135,8 @@ macOS / Windows 的 UDP 语义决定了「多个进程绑定同一端口 + 发�
 
 ## 6. 联调 / 测试
 
+完整的 Windows 真机测试步骤、界面检查项和双机联调清单见 [`TESTING.md`](TESTING.md)。
+
 ### 冒烟测试（两个 Core 实例，真实 socket）
 
 ```powershell
