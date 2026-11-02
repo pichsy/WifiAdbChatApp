@@ -1,0 +1,11 @@
+# build outputs
+build/
+dist/
+ADBType.app/
+windows/**/bin/
+windows/**/obj/
+windows/**/publish/
+# macOS
+.DS_Store
+# local test artifacts
+/tmp-recv/
