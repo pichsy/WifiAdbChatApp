@@ -1,0 +1,20 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ADBTypeLink.App.Dialogs.ConfirmWindow"
+        Title="确认操作"
+        Width="390" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{DynamicResource AppBackgroundBrush}">
+
+  <StackPanel Margin="24" Spacing="14">
+    <TextBlock x:Name="TitleText" Text="确认操作" FontSize="16" FontWeight="SemiBold"
+               TextWrapping="Wrap" Foreground="{DynamicResource TextPrimaryBrush}" />
+    <TextBlock x:Name="MessageText" FontSize="12.5" TextWrapping="Wrap"
+               Foreground="{DynamicResource TextSecondaryBrush}" />
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Content="取消" Click="OnCancel" MinWidth="76" />
+      <Button x:Name="ConfirmButton" Classes="primary" Content="确定"
+              Click="OnConfirm" MinWidth="88" />
+    </StackPanel>
+  </StackPanel>
+</Window>

@@ -1,0 +1,36 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ADBTypeLink.App.Dialogs.PairingWindow"
+        Title="配对"
+        Width="430" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{DynamicResource AppBackgroundBrush}">
+
+  <StackPanel Margin="24" Spacing="14">
+    <TextBlock x:Name="TitleText" Text="配对" FontSize="18" FontWeight="SemiBold"
+               TextWrapping="Wrap" Foreground="{DynamicResource TextPrimaryBrush}" />
+
+    <TextBlock x:Name="HelpText" FontSize="12.5" TextWrapping="Wrap"
+               Foreground="{DynamicResource TextSecondaryBrush}" />
+
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <TextBox x:Name="CodeBox"
+               Width="250" MaxLength="6"
+               FontSize="26" FontWeight="SemiBold"
+               FontFamily="Menlo, Consolas, monospace"
+               TextAlignment="Center" VerticalContentAlignment="Center"
+               Padding="8" Watermark="6 位配对码"
+               TextChanged="OnCodeChanged" />
+      <Button Content="粘贴" Click="OnPaste" MinWidth="64" VerticalAlignment="Stretch" />
+    </StackPanel>
+
+    <TextBlock x:Name="ErrorText" FontSize="12" TextWrapping="Wrap"
+               Foreground="{DynamicResource FailureBrush}" IsVisible="False" />
+
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Content="取消" Click="OnCancel" MinWidth="76" />
+      <Button x:Name="ConfirmButton" Classes="primary" Content="配对"
+              Click="OnConfirm" IsEnabled="False" MinWidth="100" />
+    </StackPanel>
+  </StackPanel>
+</Window>

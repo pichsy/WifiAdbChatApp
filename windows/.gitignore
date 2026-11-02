@@ -1,0 +1,15 @@
+# 构建产物
+bin/
+obj/
+publish/
+*.user
+*.suo
+.vs/
+.idea/
+
+# 本地调试
+*.log
+TestResults/
+
+# macOS
+.DS_Store

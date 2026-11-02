@@ -8,6 +8,13 @@
 Windows 端是同一套协议的 Avalonia + .NET 8 客户端，源码在 [`windows/`](windows/)，
 界面与 macOS 端一致。
 
+## 界面预览
+
+| macOS「电脑设备」页（深色 / 浅色） | Windows 端（深色 / 浅色） |
+| --- | --- |
+| ![macOS](docs/screenshots/macos-chat-dark.png) | ![Windows](docs/screenshots/windows-chat-dark.png) |
+| ![macOS 浅色](docs/screenshots/macos-chat-light.png) | ![Windows 浅色](docs/screenshots/windows-chat-light.png) |
+
 ---
 
 ## 一、移动设备（手机输入）

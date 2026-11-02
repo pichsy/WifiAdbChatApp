@@ -1,0 +1,239 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="ADBTypeLink.App.App"
+             RequestedThemeVariant="Default">
+
+  <Application.Styles>
+    <FluentTheme />
+
+    <!-- 主按钮 -->
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="16,8" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AccentHoverBrush}" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button.primary:disabled /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource DisabledBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}" />
+    </Style>
+
+    <!-- 次要按钮 -->
+    <Style Selector="Button.secondary">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="12,6" />
+    </Style>
+    <Style Selector="Button.secondary:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource RowHoverBrush}" />
+    </Style>
+
+    <!-- 文字链接按钮 -->
+    <Style Selector="Button.link">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="4,2" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+    <Style Selector="Button.link:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource RowHoverBrush}" />
+    </Style>
+
+    <!-- 图标小按钮 -->
+    <Style Selector="Button.icon">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="6" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+    <Style Selector="Button.icon:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource RowHoverBrush}" />
+    </Style>
+
+    <!-- 侧栏设备行 -->
+    <Style Selector="Border.peerRow">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="8,7" />
+      <Setter Property="Margin" Value="0,1" />
+    </Style>
+    <Style Selector="Border.peerRow:pointerover">
+      <Setter Property="Background" Value="{DynamicResource RowHoverBrush}" />
+    </Style>
+    <Style Selector="Border.peerRow.selected">
+      <Setter Property="Background" Value="{DynamicResource RowSelectedBrush}" />
+    </Style>
+
+    <!-- 徽标 -->
+    <Style Selector="Border.badge">
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="Padding" Value="6,1" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.badge.paired">
+      <Setter Property="Background" Value="{DynamicResource BadgePairedBrush}" />
+    </Style>
+    <Style Selector="Border.badge.unpaired">
+      <Setter Property="Background" Value="{DynamicResource BadgeUnpairedBrush}" />
+    </Style>
+    <Style Selector="Border.badge > TextBlock">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="FontWeight" Value="Medium" />
+    </Style>
+    <Style Selector="Border.badge.paired > TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
+    </Style>
+    <Style Selector="Border.badge.unpaired > TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+    </Style>
+
+    <!-- 头像 -->
+    <Style Selector="Border.avatar">
+      <Setter Property="Width" Value="34" />
+      <Setter Property="Height" Value="34" />
+      <Setter Property="CornerRadius" Value="17" />
+      <Setter Property="Background" Value="{DynamicResource AvatarIncomingBrush}" />
+    </Style>
+    <Style Selector="Border.avatar.outgoing">
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+    </Style>
+    <Style Selector="Border.avatar > TextBlock">
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- 气泡 -->
+    <Style Selector="Border.bubble">
+      <Setter Property="Background" Value="{DynamicResource IncomingBubbleBrush}" />
+      <Setter Property="CornerRadius" Value="11" />
+      <Setter Property="Padding" Value="11,8" />
+      <Setter Property="MaxWidth" Value="560" />
+    </Style>
+    <Style Selector="Border.bubble.outgoing">
+      <Setter Property="Background" Value="{DynamicResource OutgoingBubbleBrush}" />
+    </Style>
+    <Style Selector="Border.bubble TextBlock.bubbleText">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="Border.bubble.outgoing TextBlock.metaDim">
+      <Setter Property="Foreground" Value="{DynamicResource OutgoingBubbleMetaBrush}" />
+    </Style>
+    <Style Selector="Border.bubble.outgoing Button.link">
+      <Setter Property="Foreground" Value="{DynamicResource OutgoingBubbleLinkBrush}" />
+    </Style>
+
+    <!-- 元信息文字 -->
+    <Style Selector="TextBlock.meta">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock.metaDim">
+      <Setter Property="FontSize" Value="10.5" />
+      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock.sectionTitle">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}" />
+      <Setter Property="Margin" Value="2,10,0,4" />
+    </Style>
+
+    <!-- 状态文字 -->
+    <Style Selector="TextBlock.statusText">
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+    <Style Selector="TextBlock.statusText.success">
+      <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
+    </Style>
+    <Style Selector="TextBlock.statusText.failure">
+      <Setter Property="Foreground" Value="{DynamicResource FailureBrush}" />
+    </Style>
+
+    <!-- 配对码 -->
+    <Style Selector="TextBlock.pairingCode">
+      <Setter Property="FontFamily" Value="Menlo, Consolas, monospace" />
+      <Setter Property="FontSize" Value="22" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+      <Setter Property="LetterSpacing" Value="1" />
+    </Style>
+  </Application.Styles>
+
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="AppBackgroundBrush" Color="#F4F4F6" />
+          <SolidColorBrush x:Key="SidebarBrush" Color="#ECECEF" />
+          <SolidColorBrush x:Key="CardBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="ComposerBrush" Color="#FBFBFC" />
+          <SolidColorBrush x:Key="DividerBrush" Color="#DEDEE3" />
+          <SolidColorBrush x:Key="TextPrimaryBrush" Color="#1B1B1F" />
+          <SolidColorBrush x:Key="TextSecondaryBrush" Color="#66666E" />
+          <SolidColorBrush x:Key="TextTertiaryBrush" Color="#95959D" />
+          <SolidColorBrush x:Key="RowHoverBrush" Color="#10000000" />
+          <SolidColorBrush x:Key="RowSelectedBrush" Color="#1F0A84FF" />
+          <SolidColorBrush x:Key="IncomingBubbleBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="OutgoingBubbleBrush" Color="#DCEBFF" />
+          <SolidColorBrush x:Key="AvatarIncomingBrush" Color="#B4B8C0" />
+          <SolidColorBrush x:Key="AccentBrush" Color="#0A6FE8" />
+          <SolidColorBrush x:Key="AccentHoverBrush" Color="#0B5FC4" />
+          <SolidColorBrush x:Key="DisabledBrush" Color="#D6D6DC" />
+          <SolidColorBrush x:Key="SuccessBrush" Color="#1F8A4C" />
+          <SolidColorBrush x:Key="FailureBrush" Color="#CC2F27" />
+          <SolidColorBrush x:Key="WarningBrush" Color="#B26A00" />
+          <SolidColorBrush x:Key="BadgePairedBrush" Color="#221F8A4C" />
+          <SolidColorBrush x:Key="BadgeUnpairedBrush" Color="#22B26A00" />
+          <SolidColorBrush x:Key="DropOverlayBrush" Color="#2E0A6FE8" />
+          <SolidColorBrush x:Key="PendingPairBrush" Color="#18B26A00" />
+          <SolidColorBrush x:Key="OutgoingBubbleMetaBrush" Color="#5B7695" />
+          <SolidColorBrush x:Key="OutgoingBubbleLinkBrush" Color="#1D5FAE" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="AppBackgroundBrush" Color="#1A1A1D" />
+          <SolidColorBrush x:Key="SidebarBrush" Color="#1F1F23" />
+          <SolidColorBrush x:Key="CardBrush" Color="#25252A" />
+          <SolidColorBrush x:Key="ComposerBrush" Color="#222226" />
+          <SolidColorBrush x:Key="DividerBrush" Color="#33333A" />
+          <SolidColorBrush x:Key="TextPrimaryBrush" Color="#ECECF0" />
+          <SolidColorBrush x:Key="TextSecondaryBrush" Color="#A2A2AB" />
+          <SolidColorBrush x:Key="TextTertiaryBrush" Color="#75757E" />
+          <SolidColorBrush x:Key="RowHoverBrush" Color="#12FFFFFF" />
+          <SolidColorBrush x:Key="RowSelectedBrush" Color="#383C9BFF" />
+          <SolidColorBrush x:Key="IncomingBubbleBrush" Color="#2C2C33" />
+          <SolidColorBrush x:Key="OutgoingBubbleBrush" Color="#17457A" />
+          <SolidColorBrush x:Key="AvatarIncomingBrush" Color="#4B4B55" />
+          <SolidColorBrush x:Key="AccentBrush" Color="#3C9BFF" />
+          <SolidColorBrush x:Key="AccentHoverBrush" Color="#63B0FF" />
+          <SolidColorBrush x:Key="DisabledBrush" Color="#3A3A42" />
+          <SolidColorBrush x:Key="SuccessBrush" Color="#4ED08A" />
+          <SolidColorBrush x:Key="FailureBrush" Color="#FF6F66" />
+          <SolidColorBrush x:Key="WarningBrush" Color="#FFB44D" />
+          <SolidColorBrush x:Key="BadgePairedBrush" Color="#2E4ED08A" />
+          <SolidColorBrush x:Key="BadgeUnpairedBrush" Color="#2EFFB44D" />
+          <SolidColorBrush x:Key="DropOverlayBrush" Color="#333C9BFF" />
+          <SolidColorBrush x:Key="PendingPairBrush" Color="#1FFFB44D" />
+          <SolidColorBrush x:Key="OutgoingBubbleMetaBrush" Color="#A9C7E8" />
+          <SolidColorBrush x:Key="OutgoingBubbleLinkBrush" Color="#CFE5FF" />
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+</Application>
