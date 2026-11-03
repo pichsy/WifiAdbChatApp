@@ -182,7 +182,7 @@
 | 设备 ID | UserDefaults `lanDeviceID` | `%APPDATA%\\ADBTypeLink\\device.json`（或等价的 settings 文件） |
 | 已配对设备 ID 列表 | `~/Library/Application Support/ADBType/paired.json`，JSON 字符串数组，如 `["id1","id2"]` | `%APPDATA%\\ADBTypeLink\\paired.json`，同格式 |
 | 聊天记录 | `~/Library/Application Support/ADBType/chats/<设备ID>.json`（每设备独立会话） | `%APPDATA%\\ADBTypeLink\\chats/<设备ID>.json`（每设备独立会话） |
-| 已配对好友列表 | `~/Library/Application Support/ADBType/friends.json`（id / name / host / port / lastSeen / alias） | `%APPDATA%\\ADBTypeLink\\devices.json`（id / name / lastSeen；暂不支持 alias） |
+| 已配对好友列表 | `~/Library/Application Support/ADBType/friends.json`（id / name / host / port / lastSeen / alias） | `%APPDATA%\\ADBTypeLink\\friends.json`，**字段与格式完全相同** |
 | 接收目录 | UserDefaults `lanReceiveDir` | 设置文件；默认 `%USERPROFILE%\\Downloads\\ADBType 接收` |
 
 - Windows 端**不要**读写 macOS 的 `ADBType` 目录（在 macOS 上本地调试时请用 `~/Library/Application Support/ADBTypeLink/`，避免与正式 macOS 端数据冲突）。
@@ -194,6 +194,10 @@
   历史照常可查——连接状态不同不代表设备消失。
 - 每条消息元素字段：`id`(uuid)、`direction`(`incoming`/`outgoing`)、`peerName`、`date`、
   `kind`(`text`/`file`)、`text`、`fileName`、`filePath`、`fileSize`。
+- **两端 JSON 结构逐字段一致**（Windows 从本次对齐起）：`peerId` 不写进文件（归属由文件名决定）、
+  `date`/`lastSeen` 是**自 2001-01-01 UTC 起的秒数**（Swift `Date` 的默认编码，不是 ISO 字符串）、
+  空的可选字段整个键不出现、文件名只把 `/` 和 `:` 换成 `_`。`alias` 是本地别名，显示优先于设备名，
+  取消配对时一并清除。上一版的 `devices.json` 会自动并进 `friends.json`（改名 `.migrated` 留底）。
 - 每个设备会话最多保留 500 条；清空聊天记录**不删除**已收到的文件。
 
 ---

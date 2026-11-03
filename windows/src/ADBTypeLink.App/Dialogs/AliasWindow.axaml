@@ -1,0 +1,21 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ADBTypeLink.App.Dialogs.AliasWindow"
+        Title="设置别名"
+        Width="390" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{DynamicResource AppBackgroundBrush}">
+
+  <StackPanel Margin="24" Spacing="14">
+    <TextBlock Text="给这台设备起个本地别名" FontSize="16" FontWeight="SemiBold"
+               Foreground="{DynamicResource TextPrimaryBrush}" />
+    <TextBlock x:Name="HintText" FontSize="12.5" TextWrapping="Wrap"
+               Foreground="{DynamicResource TextSecondaryBrush}" />
+    <TextBox x:Name="AliasBox" Watermark="留空 = 用设备名" />
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Content="取消" Click="OnCancel" MinWidth="76" />
+      <Button Content="清除别名" Click="OnClear" MinWidth="88" />
+      <Button Classes="primary" Content="保存" Click="OnConfirm" MinWidth="88" />
+    </StackPanel>
+  </StackPanel>
+</Window>

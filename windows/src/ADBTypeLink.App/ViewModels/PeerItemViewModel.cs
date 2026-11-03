@@ -20,6 +20,7 @@ public sealed class PeerItemViewModel : ObservableObject
     private bool _isOnline = true;
     private DateTime _probeOkUtc = DateTime.MinValue;
     private bool _isProbing;
+    private string? _alias;
 
     public PeerItemViewModel(LinkPeer peer)
     {
@@ -32,23 +33,41 @@ public sealed class PeerItemViewModel : ObservableObject
     /// 名册里的设备：此刻没广播到，但配对过或者有过来往。
     /// 它必须留在列表里——历史记录还在，只是连接状态不同。
     /// </summary>
-    public static PeerItemViewModel FromKnown(KnownDevice device)
+    public static PeerItemViewModel FromKnown(Friend friend)
     {
         var item = new PeerItemViewModel(new LinkPeer
         {
-            Id = device.Id,
-            Name = device.Name,
-            Host = string.Empty,
-            Port = 0,
-            LastSeenUtc = device.LastSeenUtc,
+            Id = friend.Id,
+            Name = friend.Name,
+            Host = friend.Host,
+            Port = friend.Port,
+            LastSeenUtc = friend.LastSeenUtc,
         })
         {
             IsKnown = true,
+            Alias = friend.Alias,
         };
 
         item.IsOnline = false;
         return item;
     }
+
+    /// <summary>本地别名（friends.json 里的 alias），优先于设备名显示。</summary>
+    public string? Alias
+    {
+        get => _alias;
+        set
+        {
+            if (SetProperty(ref _alias, value))
+            {
+                OnPropertyChanged(nameof(DisplayName));
+                OnPropertyChanged(nameof(AvatarText));
+            }
+        }
+    }
+
+    /// <summary>界面上显示的名字：有别名用别名。</summary>
+    public string DisplayName => string.IsNullOrWhiteSpace(_alias) ? _peer.Name : _alias!;
 
     /// <summary>是不是从名册里恢复出来的（持久化过）。</summary>
     public bool IsKnown { get; init; }
@@ -183,7 +202,7 @@ public sealed class PeerItemViewModel : ObservableObject
     public int Port => _peer.Port;
 
     /// <summary>头像里的首字（支持 emoji / 代理对）。</summary>
-    public string AvatarText => FirstTextElement(Name);
+    public string AvatarText => FirstTextElement(DisplayName);
 
     public bool IsSelected
     {

@@ -348,7 +348,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     public bool HasSelectedPeer => SelectedPeer is not null;
 
-    public string HeaderTitle => SelectedPeer?.Name ?? "文件互传助手";
+    public string HeaderTitle => SelectedPeer?.DisplayName ?? "文件互传助手";
 
     public string HeaderStatusText
     {
@@ -544,6 +544,41 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         RaiseHeaderProperties();
     }
 
+    /// <summary>给当前设备设置 / 清除别名（存进 friends.json，优先显示）。</summary>
+    public void ApplyAlias(string? alias)
+    {
+        var peer = SelectedPeer;
+        if (peer is null)
+        {
+            return;
+        }
+
+        var trimmed = alias?.Trim() ?? string.Empty;
+        var next = string.IsNullOrEmpty(trimmed) || string.Equals(trimmed, peer.Name, StringComparison.Ordinal)
+            ? null
+            : trimmed;
+
+        _engine.SetAlias(peer.Id, next);
+        peer.Alias = next;
+        RaiseHeaderProperties();
+        ApplyStatus(_engine.Status);
+        SortPeers();
+    }
+
+    /// <summary>清除全部别名缓存。</summary>
+    public void ClearAliases()
+    {
+        _engine.ClearAliases();
+        foreach (var item in _peers)
+        {
+            item.Alias = null;
+        }
+
+        RaiseHeaderProperties();
+        ApplyStatus(_engine.Status);
+        SortPeers();
+    }
+
     /// <summary>只清当前这台设备的记录，别的设备一个字都不动。</summary>
     public void ClearMessages()
     {
@@ -553,7 +588,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             return;
         }
 
-        _engine.ClearConversation(peer.Id, peer.Name);
+        _engine.ClearConversation(peer.Id);
         peer.HasHistory = false;
     }
 
@@ -786,8 +821,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
         // 名册：配对过的、有过来往的。它们即使此刻没广播到，也要留在列表里，
         // 只是状态显示为离线——历史记录仍然能打开。
-        var known = new Dictionary<string, KnownDevice>(StringComparer.Ordinal);
-        foreach (var device in _engine.KnownDevices)
+        var known = new Dictionary<string, Friend>(StringComparer.Ordinal);
+        foreach (var device in _engine.Friends)
         {
             known[device.Id] = device;
         }
@@ -806,14 +841,14 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             {
                 _peers[index].Update(peer);
                 _peers[index].IsPaired = _engine.IsPaired(peer.Id);
-                _peers[index].HasHistory = _engine.HasConversation(peer.Id, peer.Name);
+                _peers[index].HasHistory = _engine.HasConversation(peer.Id);
             }
             else
             {
                 _peers.Add(new PeerItemViewModel(peer)
                 {
                     IsPaired = _engine.IsPaired(peer.Id),
-                    HasHistory = _engine.HasConversation(peer.Id, peer.Name),
+                    HasHistory = _engine.HasConversation(peer.Id),
                 });
             }
         }
@@ -825,13 +860,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             if (index >= 0)
             {
                 _peers[index].IsPaired = _engine.IsPaired(device.Id);
-                _peers[index].HasHistory = _engine.HasConversation(device.Id, device.Name);
+                _peers[index].HasHistory = _engine.HasConversation(device.Id);
                 continue;
             }
 
             var item = PeerItemViewModel.FromKnown(device);
             item.IsPaired = _engine.IsPaired(device.Id);
-            item.HasHistory = _engine.HasConversation(device.Id, device.Name);
+            item.HasHistory = _engine.HasConversation(device.Id);
             _peers.Add(item);
         }
 
@@ -900,7 +935,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         var peer = _selectedPeer;
         if (peer is not null)
         {
-            foreach (var message in _engine.GetConversation(peer.Id, peer.Name))
+            foreach (var message in _engine.GetConversation(peer.Id))
             {
                 _messages.Add(new MessageItemViewModel(message));
             }
@@ -1053,11 +1088,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         });
 
         // 演示：一台离线但有历史记录的设备，验证它仍然留在列表里、状态不同。
-        var offline = PeerItemViewModel.FromKnown(new KnownDevice
+        var offline = PeerItemViewModel.FromKnown(new Friend
         {
             Id = "demo-imac",
             Name = "家里的 iMac",
             LastSeenUtc = DateTime.UtcNow.AddHours(-5),
+            Alias = "客厅那台",
         });
         offline.IsPaired = true;
         offline.HasHistory = true;

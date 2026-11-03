@@ -34,8 +34,8 @@ public sealed class LinkPaths
     /// <summary>按设备分开的聊天记录目录：chats/&lt;peerId&gt;.json。</summary>
     public string ChatsDirectory => Path.Combine(DataDirectory, "chats");
 
-    /// <summary>记住过的设备（配对过 / 有过往来），用于离线也留在列表里。</summary>
-    public string KnownDevicesFile => Path.Combine(DataDirectory, "devices.json");
+    /// <summary>好友名册（配对过 / 有过往来），格式与 macOS 的 friends.json 一致。</summary>
+    public string FriendsFile => Path.Combine(DataDirectory, "friends.json");
 
     /// <summary>本机设置（接收目录等）。</summary>
     public string SettingsFile => Path.Combine(DataDirectory, "settings.json");

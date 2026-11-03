@@ -88,7 +88,9 @@ dotnet run --project src/ADBTypeLink.App -c Release
 4. 底部输入框输入文字，`Enter` 发送、`Shift+Enter` 换行；点 📎 选择文件（可多选），文件进入待发送列表（chips），
    再点「发送文件」；也可以把文件直接拖到窗口任意位置。
 5. 收到的文件保存在「接收目录」（默认 `%USERPROFILE%\Downloads\ADBType 接收`），重名自动加 `(2)`、`(3)` 序号。
-6. 消息区右键文字可「复制文字」，文件卡片可「打开 / 显示」；`⋯` 菜单可清空记录、修改接收目录。
+6. 消息区右键：文字可「复制文字 / 复制来源与时间」，文件或图片可「打开文件 / 在文件夹中显示 /
+   打开所在文件夹 / 复制文件名 / 复制文件路径」，文件已被删掉时那几项自动置灰。
+   `⋯` 菜单可「设置别名 / 清除全部别名」、清空记录、修改接收目录。
 
 ### 移动设备（adb）
 
@@ -134,7 +136,7 @@ adb 会依次从 `ANDROID_HOME`、`ANDROID_SDK_ROOT`、`%LOCALAPPDATA%\Android\S
 | --- | --- |
 | 设备 ID | `%APPDATA%\ADBTypeLink\device.json` |
 | 已配对设备 | `%APPDATA%\ADBTypeLink\paired.json`（JSON 字符串数组） |
-| 设备名册 | `%APPDATA%\ADBTypeLink\devices.json`（配对过 / 有过来往的设备） |
+| 好友名册 | `%APPDATA%\ADBTypeLink\friends.json`（配对过 / 有过来往的设备，含别名） |
 | 聊天记录 | `%APPDATA%\ADBTypeLink\chats\<设备ID>.json`（**每台设备一个文件**，各 500 条） |
 | 接收目录设置 | `%APPDATA%\ADBTypeLink\settings.json` |
 | 默认接收目录 | `%USERPROFILE%\Downloads\ADBType 接收` |
@@ -148,11 +150,29 @@ adb 会依次从 `ANDROID_HOME`、`ANDROID_SDK_ROOT`、`%LOCALAPPDATA%\Android\S
 - **切换设备 = 换一份会话**。右上角聊天区永远只显示当前选中那台设备的往来，
   不会把发给别人的内容混进来。
 - **离线设备照样在列表里**。只要配对过或者有过消息来往，设备就进了
-  `devices.json` 名册；即使它此刻没上线，也显示为「离线 · 上次 12:34」，
+  `friends.json` 名册；即使它此刻没上线，也显示为「离线 · 上次 12:34」，
   点进去照样能翻历史记录——连接状态不同，不代表设备消失。
-- **旧数据自动迁移**。升级后 `chat.json` 会被拆成 `chats/legacy:<名字>.json`，
-  原文件改名为 `chat.json.migrated` 留底。旧消息没有设备 ID，按名字归到同名设备；
-  之后这台设备再来消息，新消息存到它自己的 ID 文件里，显示时按时间合并，不会重复也不会丢。
+- **文件格式与 macOS 端完全一致**（以 macOS 为准）：
+
+  ```jsonc
+  // friends.json —— 数组，字段与 Swift 的 StoredFriend 同名
+  [{"id":"695DF0EC-...","name":"pichs","host":"172.16.100.144","port":52659,
+    "lastSeen":815380862.11,"alias":"办公室的 Mac"}]
+
+  // chats/<设备ID>.json —— 数组，与 Swift 的 LANMessage 同名
+  [{"id":"56509d28-...","direction":"incoming","peerName":"pichs",
+    "date":815380862.31,"kind":"text","text":"你好"}]
+  ```
+
+  - 时间沿用 Swift 的 `Date` 编码：**自 2001-01-01 UTC 起的秒数**（double），不是 ISO 字符串；
+  - 消息体里**没有** `peerId`，消息属于谁由文件名决定；
+  - 可选字段为空时整个键不出现；文件名只把 `/` `:` 换成 `_`。
+  - `alias` 是本地别名，显示时优先于设备名；取消配对时一并清除。
+    UI 入口是聊天头部的 `⋯` →「设置别名…」，留空或填回设备名即等于清除。
+- **旧数据自动迁移**。老版本的 `chat.json` 会拆到各设备名下，原文件改名
+  `chat.json.migrated`；上一版的 `devices.json` 会并进 `friends.json` 并改名
+  `devices.json.migrated`。旧消息没有设备 ID，按 `peerName` 归到同名设备，
+  对不上号的单独成一份会话，绝不丢数据。
 
 
 ### 协议要点（详见 spec）

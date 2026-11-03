@@ -224,7 +224,7 @@
                       </Border>
 
                       <Grid Grid.Column="1" ColumnDefinitions="*,Auto">
-                        <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold"
+                        <TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold"
                                    TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                                    Foreground="{DynamicResource TextPrimaryBrush}" />
                         <Border Grid.Column="1" Classes="badge"
@@ -369,6 +369,9 @@
             <Button Classes="icon" Content="⋯" ToolTip.Tip="更多">
               <Button.Flyout>
                 <MenuFlyout>
+                  <MenuItem Header="设置别名…" Click="OnEditAlias" IsEnabled="{Binding HasSelectedPeer}" />
+                  <MenuItem Header="清除全部别名" Click="OnClearAliases" />
+                  <Separator />
                   <MenuItem Header="清空记录" Click="OnClearMessages" />
                   <MenuItem Header="修改接收目录…" Click="OnChangeReceiveDir" />
                   <MenuItem Header="在文件管理器中打开接收目录" Click="OnOpenReceiveDir" />
@@ -382,9 +385,12 @@
 
       <!-- 消息列表 -->
       <Grid Grid.Row="1">
+        <!-- 内边距放在内容里，而不是 ScrollViewer 上：否则这段留白不计入可滚动高度，
+             滚到底时最后一条消息会被截掉一截。 -->
         <ScrollViewer x:Name="MessageScroll" VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Disabled" Padding="18,10">
-          <ItemsControl ItemsSource="{Binding Messages}" Margin="0,0,0,14">
+                      HorizontalScrollBarVisibility="Disabled">
+          <Border Padding="18,10,18,22">
+          <ItemsControl ItemsSource="{Binding Messages}">
             <ItemsControl.ItemTemplate>
               <DataTemplate>
                 <Grid ColumnDefinitions="38,*,38" Margin="0,7">
@@ -435,6 +441,7 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
+          </Border>
         </ScrollViewer>
 
         <!-- 空状态 -->

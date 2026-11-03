@@ -270,6 +270,24 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnEditAlias(object? sender, RoutedEventArgs e)
+    {
+        if (_viewModel.SelectedPeer is not { } peer)
+        {
+            return;
+        }
+
+        var alias = await AliasWindow.ShowAsync(this, peer.Name, peer.Alias);
+        if (alias is null)
+        {
+            return;
+        }
+
+        _viewModel.ApplyAlias(alias);
+    }
+
+    private void OnClearAliases(object? sender, RoutedEventArgs e) => _viewModel.ClearAliases();
+
     private async void OnReconnectSelected(object? sender, RoutedEventArgs e)
     {
         try
@@ -573,6 +591,101 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// 右键菜单：文字可复制；文件/图片可打开、在文件夹中显示、复制文件名和路径。
+    /// 文件已经被删掉时那两个「打开」项直接置灰，而不是点了没反应。
+    /// </summary>
+    private void BuildMessageMenu(ItemCollection items, MessageItemViewModel message)
+    {
+        var path = message.Message.FilePath;
+        var exists = !string.IsNullOrEmpty(path) && File.Exists(path);
+
+        if (message.IsText)
+        {
+            var copy = new MenuItem { Header = "复制文字" };
+            copy.Click += async (_, _) => await CopyMessageAsync(message);
+            items.Add(copy);
+
+            var copyRow = new MenuItem { Header = "复制「谁 · 时间 · 内容」" };
+            copyRow.Click += async (_, _) => await CopyTextAsync($"{message.SenderLabel} {message.TimeText}：{message.Text}");
+            items.Add(copyRow);
+        }
+        else
+        {
+            var open = new MenuItem { Header = "打开文件", IsEnabled = exists };
+            open.Click += (_, _) =>
+            {
+                if (!ShellLauncher.TryOpenFile(path!))
+                {
+                    _viewModel.SetLocalFailure($"打不开文件：{path}");
+                }
+            };
+            items.Add(open);
+
+            var reveal = new MenuItem { Header = "在文件夹中显示", IsEnabled = exists };
+            reveal.Click += (_, _) => RevealMessageFile(message);
+            items.Add(reveal);
+
+            var folder = new MenuItem { Header = "打开所在文件夹", IsEnabled = exists };
+            folder.Click += (_, _) =>
+            {
+                var directory = Path.GetDirectoryName(path!);
+                if (directory is null || !ShellLauncher.TryOpenDirectory(directory))
+                {
+                    _viewModel.SetLocalFailure($"打不开文件夹：{directory ?? path}");
+                }
+            };
+            items.Add(folder);
+
+            items.Add(new Separator());
+
+            var copyName = new MenuItem { Header = "复制文件名" };
+            copyName.Click += async (_, _) => await CopyTextAsync(message.FileName);
+            items.Add(copyName);
+
+            var copyPath = new MenuItem { Header = "复制文件路径", IsEnabled = !string.IsNullOrEmpty(path) };
+            copyPath.Click += async (_, _) => await CopyTextAsync(path ?? string.Empty);
+            items.Add(copyPath);
+
+            if (!exists)
+            {
+                var missing = new MenuItem { Header = "文件已不在磁盘上", IsEnabled = false };
+                items.Add(new Separator());
+                items.Add(missing);
+            }
+        }
+
+        items.Add(new Separator());
+
+        var copyMeta = new MenuItem { Header = "复制来源与时间" };
+        copyMeta.Click += async (_, _) => await CopyTextAsync($"{message.SenderLabel} {message.TimeText}");
+        items.Add(copyMeta);
+    }
+
+    private async Task CopyTextAsync(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+
+        try
+        {
+            var clipboard = GetTopLevel(this)?.Clipboard;
+            if (clipboard is null)
+            {
+                return;
+            }
+
+            await clipboard.SetTextAsync(text);
+            _viewModel.ReportCopied();
+        }
+        catch (Exception exception)
+        {
+            _viewModel.SetLocalFailure($"复制失败：{exception.Message}");
+        }
+    }
+
     private void OnBubblePointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (sender is not Control control || control.DataContext is not MessageItemViewModel message)
@@ -586,19 +699,7 @@ public partial class MainWindow : Window
         }
 
         var flyout = new MenuFlyout();
-        if (message.IsText)
-        {
-            var copy = new MenuItem { Header = "复制文字" };
-            copy.Click += async (_, _) => await CopyMessageAsync(message);
-            flyout.Items.Add(copy);
-        }
-        else
-        {
-            var reveal = new MenuItem { Header = message.IsOutgoing ? "打开文件" : "在文件夹中显示" };
-            reveal.Click += (_, _) => RevealMessageFile(message);
-            flyout.Items.Add(reveal);
-        }
-
+        BuildMessageMenu(flyout.Items, message);
         flyout.ShowAt(control);
         e.Handled = true;
     }

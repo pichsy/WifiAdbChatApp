@@ -14,7 +14,7 @@ public sealed class LinkEngine : IAsyncDisposable
     private readonly LinkPaths _paths;
     private readonly PairedStore _paired;
     private readonly ConversationStore _chats;
-    private readonly DeviceStore _devices;
+    private readonly FriendStore _friends;
     private readonly SettingsStore _settings;
     private readonly object _peersGate = new();
     private readonly Dictionary<string, LinkPeer> _peers = new(StringComparer.Ordinal);
@@ -39,8 +39,16 @@ public sealed class LinkEngine : IAsyncDisposable
         DeviceId = Options.DeviceId ?? DeviceIdStore.LoadOrCreate(_paths.DeviceIdFile);
         DeviceName = Options.DeviceName ?? DeviceNameProvider.GetDefaultName();
         _paired = new PairedStore(_paths.PairedFile);
-        _chats = new ConversationStore(_paths.ChatsDirectory, _paths.ChatFile);
-        _devices = new DeviceStore(_paths.KnownDevicesFile);
+        _friends = new FriendStore(_paths.FriendsFile);
+        _chats = new ConversationStore(_paths.ChatsDirectory);
+
+        // 旧数据迁移（与 macOS 同策略）：先把上一版 legacy: 会话键并回正常结构，
+        // 再把单文件 chat.json 拆到各设备名下。
+        var roster = SnapshotFriends(includeConversationKeys: false)
+            .Select(friend => (friend.Id, friend.Name, friend.Alias))
+            .ToList();
+        _chats.MigrateLegacyKeys(roster);
+        _chats.MigrateLegacy(_paths.ChatFile, roster);
         _settings = new SettingsStore(_paths.SettingsFile);
         _settings.Load();
         _receiveDir = Options.ReceiveDirectory ?? _settings.ReceiveDir ?? LinkPaths.DefaultReceiveDirectory();
@@ -89,68 +97,102 @@ public sealed class LinkEngine : IAsyncDisposable
     public LinkStatus Status => _status;
 
     /// <summary>
-    /// 某台设备的会话快照。每台设备一份独立缓存，切设备只换数据源，
-    /// 跟别的设备互不影响。
+    /// 某台设备的会话快照。每台设备一份独立缓存（chats/&lt;设备ID&gt;.json），
+    /// 切设备只换数据源，跟别的设备互不影响。
     /// </summary>
-    public IReadOnlyList<ChatMessage> GetConversation(string peerId, string peerName) =>
-        _chats.SnapshotForPeer(peerId, peerName);
+    public IReadOnlyList<ChatMessage> GetConversation(string peerId) => _chats.Snapshot(peerId);
 
-    /// <summary>这台设备有没有留下过记录（决定它是否留在列表里）。</summary>
-    public bool HasConversation(string peerId, string peerName) =>
-        _chats.SnapshotForPeer(peerId, peerName).Count > 0;
+    /// <summary>这台设备有没有留下过记录。</summary>
+    public bool HasConversation(string peerId) => _chats.Snapshot(peerId).Count > 0;
+
+    /// <summary>取某台设备的显示名（有别名优先别名，与 macOS 一致）。</summary>
+    public string DisplayName(string peerId, string fallback)
+    {
+        var friend = _friends.Find(peerId);
+        return friend is not null && !string.IsNullOrWhiteSpace(friend.DisplayName)
+            ? friend.DisplayName
+            : fallback;
+    }
+
+    /// <summary>设置 / 清除本地别名（空字符串等于清除）。</summary>
+    public void SetAlias(string peerId, string? alias)
+    {
+        _friends.SetAlias(peerId, alias);
+        SetStatus(
+            LinkStatusKind.Idle,
+            string.IsNullOrWhiteSpace(alias) ? "已清除别名" : $"别名已改为「{alias.Trim()}」");
+    }
+
+    /// <summary>清除全部别名缓存。</summary>
+    public void ClearAliases()
+    {
+        var any = _friends.ClearAliases();
+        SetStatus(LinkStatusKind.Idle, any ? "已清除全部别名" : "没有设置过别名");
+    }
 
     /// <summary>
-    /// 记住过的设备：配对过的、有过来往的。即使此刻离线也要显示，
-    /// 只是状态不同，历史记录照常可看。
+    /// 好友列表：friends.json 记录过的设备 + 只有配对 ID 的设备 + 有会话但还没进名册的设备。
+    /// 即使此刻离线也要显示，只是状态不同，历史记录照常可看。
     /// </summary>
-    public IReadOnlyList<KnownDevice> KnownDevices
+    public IReadOnlyList<Friend> Friends => SnapshotFriends(includeConversationKeys: true);
+
+    private IReadOnlyList<Friend> SnapshotFriends(bool includeConversationKeys)
     {
-        get
+        var result = new List<Friend>();
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var record in _friends.Snapshot())
         {
-            var known = new List<KnownDevice>();
-            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var record in _devices.Snapshot())
+            ids.Add(record.Id);
+            result.Add(new Friend
             {
-                names.Add(record.Name);
-                known.Add(new KnownDevice
-                {
-                    Id = record.Id,
-                    Name = record.Name,
-                    LastSeenUtc = record.LastSeenUtc,
-                });
+                Id = record.Id,
+                Name = record.Name,
+                Host = record.Host,
+                Port = record.Port,
+                LastSeenUtc = record.LastSeenUtc,
+                Alias = record.Alias,
+            });
+        }
+
+        // 与 macOS 一致：paired.json 里有 ID、friends.json 还没记录的，先占个位置，
+        // 等它上线后再补名字和地址。
+        foreach (var id in _paired.Snapshot())
+        {
+            if (!ids.Add(id))
+            {
+                continue;
             }
 
-            // 已经在广播里出现的同名设备，它自己会带着旧记录展示
-            //（GetConversation 按名字合并），不能再补一台重复的设备。
-            foreach (var peer in Peers)
+            result.Add(new Friend
             {
-                names.Add(peer.Name);
-            }
+                Id = id,
+                Name = "已配对设备",
+                LastSeenUtc = DateTime.MinValue,
+            });
+        }
 
-            // 旧版本遗留的会话（没有设备 ID），按名字补成一台「离线设备」，
-            // 这样升级前收到的消息不会从列表里凭空消失。
-            foreach (var name in _chats.LegacyNames())
+        if (includeConversationKeys)
+        {
+            // 只有会话、还没进名册的（迁移过来的旧记录，或对方再没上过线）。
+            foreach (var key in _chats.Keys())
             {
-                if (string.IsNullOrWhiteSpace(name) || !names.Add(name))
+                if (string.IsNullOrWhiteSpace(key) || !ids.Add(key))
                 {
                     continue;
                 }
 
-                var messages = _chats.Snapshot(ConversationStore.LegacyPrefix + name);
-                known.Add(new KnownDevice
+                var messages = _chats.Snapshot(key);
+                result.Add(new Friend
                 {
-                    Id = ConversationStore.LegacyPrefix + name,
-                    Name = name,
-                    LastSeenUtc = messages.Count == 0
-                        ? DateTime.UtcNow
-                        : messages[^1].Date.UtcDateTime,
-                    IsLegacy = true,
+                    Id = key,
+                    Name = key,
+                    LastSeenUtc = messages.Count == 0 ? DateTime.MinValue : messages[^1].Date.UtcDateTime,
                 });
             }
-
-            return known;
         }
+
+        return result;
     }
 
     /// <summary>附近设备快照（按名称排序）。</summary>
@@ -336,34 +378,32 @@ public sealed class LinkEngine : IAsyncDisposable
     }
 
     /// <summary>清空某台设备的消息记录，不影响别的设备。</summary>
-    public void ClearConversation(string peerId, string peerName)
-    {
-        if (!string.IsNullOrEmpty(peerId))
-        {
-            _chats.Clear(peerId);
-        }
-
-        if (!string.IsNullOrEmpty(peerName))
-        {
-            _chats.Clear(ConversationStore.LegacyPrefix + peerName);
-        }
-
-        ConversationCleared?.Invoke(this, peerId ?? string.Empty);
-        SetStatus(LinkStatusKind.Idle, $"已清空与「{peerName}」的消息记录，已收到的文件不会被删除");
-    }
-
-    /// <summary>彻底忘掉一台设备：取消配对 + 删掉名册记录。</summary>
-    public void ForgetDevice(string peerId, string peerName)
+    public void ClearConversation(string peerId)
     {
         if (string.IsNullOrEmpty(peerId))
         {
             return;
         }
 
+        _chats.Clear(peerId);
+        var name = DisplayName(peerId, peerId);
+        ConversationCleared?.Invoke(this, peerId);
+        SetStatus(LinkStatusKind.Idle, $"已清空与「{name}」的消息记录，已收到的文件不会被删除");
+    }
+
+    /// <summary>彻底忘掉一台设备：取消配对 + 删掉名册记录（别名一并清除，与 macOS 一致）。</summary>
+    public void ForgetDevice(string peerId)
+    {
+        if (string.IsNullOrEmpty(peerId))
+        {
+            return;
+        }
+
+        var name = DisplayName(peerId, peerId);
         _paired.Remove(peerId);
-        _devices.Remove(peerId);
+        _friends.Remove(peerId);
         PairingChanged?.Invoke(this, EventArgs.Empty);
-        SetStatus(LinkStatusKind.Idle, $"已取消与「{peerName}」的配对");
+        SetStatus(LinkStatusKind.Idle, $"已取消与「{name}」的配对，别名和名册记录一并清除");
     }
 
     public void ReportCopied()
@@ -1255,7 +1295,7 @@ public sealed class LinkEngine : IAsyncDisposable
         // 而不是等下一次收发消息才被记住。
         if (_paired.Contains(peer.Id))
         {
-            _devices.Upsert(peer.Id, peer.Name);
+            _friends.Upsert(peer.Id, peer.Name, peer.Host, peer.Port);
         }
 
         var changed = false;
@@ -1359,7 +1399,7 @@ public sealed class LinkEngine : IAsyncDisposable
     private void RememberPaired(string peerId, string peerName)
     {
         // 配对成功就进名册：以后即使离线，这台设备也要留在列表里。
-        _devices.Upsert(peerId, peerName);
+        _friends.Upsert(peerId, peerName, string.Empty, 0);
         if (_paired.Add(peerId))
         {
             PairingChanged?.Invoke(this, EventArgs.Empty);
@@ -1461,14 +1501,23 @@ public sealed class LinkEngine : IAsyncDisposable
     /// <summary>落到这台设备自己的会话文件里，并把设备记进名册。</summary>
     private void SaveMessage(ChatMessage message)
     {
-        _chats.Append(message);
+        if (string.IsNullOrEmpty(message.PeerId))
+        {
+            return;
+        }
+
+        _chats.Append(message.PeerId, message);
         try
         {
-            _devices.Upsert(message.PeerId, message.PeerName);
+            var friend = _friends.Find(message.PeerId);
+            if (friend is null || string.IsNullOrEmpty(friend.Name))
+            {
+                _friends.Upsert(message.PeerId, message.PeerName, string.Empty, 0);
+            }
         }
         catch (Exception ex)
         {
-            Log($"device roster update failed: {ex.Message}");
+            Log($"friend roster update failed: {ex.Message}");
         }
 
         MessageAdded?.Invoke(this, message);

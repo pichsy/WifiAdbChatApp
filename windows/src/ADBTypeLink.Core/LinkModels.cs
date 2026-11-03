@@ -54,10 +54,10 @@ public sealed class ChatMessage
     public MessageDirection Direction { get; set; }
 
     /// <summary>
-    /// 消息属于哪台设备（对端持久化 ID）。旧版本 chat.json 里没有这个字段，
-    /// 迁移时留空，之后按 PeerName 归到同名的设备会话里。
+    /// 消息属于哪台设备。**只用于内存里路由，不写进文件**——与 macOS 一致，
+    /// 归属由 chats/&lt;设备ID&gt;.json 的文件名决定，消息体里没有这个字段。
     /// </summary>
-    [JsonPropertyName("peerId")]
+    [JsonIgnore]
     public string PeerId { get; set; } = string.Empty;
 
     [JsonPropertyName("peerName")]
@@ -83,20 +83,28 @@ public sealed class ChatMessage
 }
 
 /// <summary>
-/// 记住过的设备：只要配对过或者有过消息来往，即使此刻离线也要留在列表里，
-/// 只是连接状态不同——它有自己的独立聊天记录。
+/// 好友（已配对 / 有过来往的设备）。字段对齐 macOS 的 friends.json：
+/// id / name / host / port / lastSeen / alias。离线也留在列表里，历史记录照常可看。
 /// </summary>
-public sealed class KnownDevice
+public sealed class Friend
 {
     public string Id { get; init; } = string.Empty;
 
     public string Name { get; init; } = string.Empty;
 
+    /// <summary>最后一次已知地址，离线时也能拿它重连。</summary>
+    public string Host { get; init; } = string.Empty;
+
+    public int Port { get; init; }
+
     /// <summary>最后一次有来往的时间（UTC）。</summary>
     public DateTime LastSeenUtc { get; init; }
 
-    /// <summary>是否只是旧记录（没有设备 ID 的历史会话）。</summary>
-    public bool IsLegacy { get; init; }
+    /// <summary>用户起的本地别名，优先于设备名显示。</summary>
+    public string? Alias { get; init; }
+
+    /// <summary>显示名：有别名用别名。</summary>
+    public string DisplayName => string.IsNullOrWhiteSpace(Alias) ? Name : Alias!;
 }
 
 public enum LinkStatusKind

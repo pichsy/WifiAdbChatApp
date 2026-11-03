@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using ADBTypeLink.Core;
 
 namespace ADBTypeLink.SmokeTest;
@@ -137,8 +138,8 @@ internal static class Program
         }
 
         // 每台设备一份独立会话：A 看的是「B 这台设备」的记录，B 看的是「A」的。
-        IReadOnlyList<ChatMessage> SeenByA() => peerA.GetConversation(peerB.DeviceId, peerB.DeviceName);
-        IReadOnlyList<ChatMessage> SeenByB() => peerB.GetConversation(peerA.DeviceId, peerA.DeviceName);
+        IReadOnlyList<ChatMessage> SeenByA() => peerA.GetConversation(peerB.DeviceId);
+        IReadOnlyList<ChatMessage> SeenByB() => peerB.GetConversation(peerA.DeviceId);
 
         // 2. 未配对发送 -> pair_required
         var firstText = "你好，世界 👋 第一行\n第二行 with emoji 🚀";
@@ -147,7 +148,7 @@ internal static class Program
         Check(await WaitUntilAsync(() => pairRequestedByB, TimeSpan.FromSeconds(6)), "B 触发「正在请求配对」事件");
         Check(!SeenByB().Any(item => item.Text == firstText), "未配对时对端不应收到文字");
         Check(SeenByB().Count == 0 && SeenByA().Count == 0, "没有来往时两边会话都是空的");
-        Check(peerB.GetConversation("不存在的设备", "路人甲").Count == 0, "别的设备看不到这台设备的会话（隔离）");
+        Check(peerB.GetConversation("不存在的设备").Count == 0, "别的设备看不到这台设备的会话（隔离）");
 
         // 3. 带配对码发送 -> hello_ok
         var pairedText = "带配对码发送成功 ✅";
@@ -301,10 +302,10 @@ internal static class Program
                          DeviceName = "迁移测试机",
                      }))
         {
-            var migrated = legacyEngine.GetConversation("还没见过的设备ID", "老设备");
+            var migrated = legacyEngine.GetConversation("老设备");
             Check(migrated.Count == 1 && migrated[0].Text == "迁移前的旧消息", "旧 chat.json 的消息按设备归档后不丢");
-            Check(legacyEngine.GetConversation("还没见过的设备ID", "老设备").Count == 1, "同一台设备不会把历史重复算两遍");
-            Check(legacyEngine.KnownDevices.Any(device => device.Name == "老设备"), "没有设备 ID 的旧会话也作为离线设备出现");
+            Check(legacyEngine.GetConversation("老设备").Count == 1, "同一台设备不会把历史重复算两遍");
+            Check(legacyEngine.Friends.Any(friend => friend.Name == "老设备"), "没有设备 ID 的旧会话也作为离线设备出现");
             Check(!File.Exists(Path.Combine(legacyDir, "chat.json")), "迁移后旧 chat.json 改名留底");
             Check(Directory.EnumerateFiles(Path.Combine(legacyDir, "chats"), "*.json").Any(), "chats/ 下生成了按设备的会话文件");
         }
@@ -316,10 +317,33 @@ internal static class Program
         Check(File.Exists(conversationFile) && File.ReadAllText(conversationFile).Contains("报告 1.txt"),
             "每台设备一个会话文件：chats/<设备ID>.json");
         Check(!File.Exists(Path.Combine(peerB.DataDirectory, "chat.json")), "不再写全局 chat.json");
-        var rosterJson = Path.Combine(peerB.DataDirectory, "devices.json");
-        Check(File.Exists(rosterJson) && File.ReadAllText(rosterJson).Contains(peerA.DeviceId), "devices.json 记住了这台设备");
+        var rosterJson = Path.Combine(peerB.DataDirectory, "friends.json");
+        var rosterText = File.Exists(rosterJson) ? File.ReadAllText(rosterJson) : string.Empty;
+        Check(rosterText.Contains(peerA.DeviceId), "friends.json 记住了这台设备（与 macOS 同名）");
+        Check(rosterText.Contains("\"lastSeen\"") && rosterText.Contains("\"host\"") && rosterText.Contains("\"port\""),
+            "friends.json 字段与 macOS 一致：id/name/host/port/lastSeen");
+        Check(!rosterText.Contains("\"LastSeenUtc\""), "friends.json 不再写 PascalCase 字段");
+        Check(!File.Exists(Path.Combine(peerB.DataDirectory, "devices.json")), "不再写旧版 devices.json");
         var deviceJson = Path.Combine(peerB.DataDirectory, "device.json");
         Check(File.Exists(deviceJson) && File.ReadAllText(deviceJson).Contains(peerB.DeviceId), "device.json 已持久化设备 ID");
+
+        // 16b. 会话与名册的 JSON 结构必须和 macOS 写出来的一模一样
+        var convText = File.ReadAllText(conversationFile);
+        Check(!convText.Contains("\"peerId\""), "消息里没有 peerId 字段（归属由文件名决定，同 macOS）");
+        Check(convText.Contains("\"direction\":\"incoming\"") || convText.Contains("\"direction\":\"outgoing\""),
+            "direction 写成小写 incoming/outgoing");
+        Check(convText.Contains("\"kind\":\"text\"") || convText.Contains("\"kind\":\"file\""), "kind 写成小写 text/file");
+        Check(Regex.IsMatch(convText, "\"date\":-?[0-9.]+"),
+            "date 是 2001 基准的秒数（Swift Date 编码），不是 ISO 字符串");
+
+        // 16c. 别名（friends.json 的 alias 字段）
+        peerB.SetAlias(peerA.DeviceId, "办公室的 Mac");
+        var aliasRecord = peerB.Friends.FirstOrDefault(friend => friend.Id == peerA.DeviceId);
+        Check(aliasRecord is not null && aliasRecord.Alias == "办公室的 Mac", "别名写进了名册");
+        Check(peerB.DisplayName(peerA.DeviceId, "兜底名") == "办公室的 Mac", "有别名时优先显示别名");
+        Check(peerB.DisplayName("没有这台设备", "兜底名") == "兜底名", "没有别名时回落到原设备名");
+        var aliasText = File.ReadAllText(rosterJson);
+        Check(aliasText.Contains("\"alias\":\"办公室的 Mac\""), "friends.json 里是 camelCase 的 alias 字段");
 
         // 18. 重启后恢复
         var bDataDir = peerB.DataDirectory;
@@ -337,9 +361,11 @@ internal static class Program
         {
             Check(reborn.DeviceId == bDeviceId, "重启后设备 ID 不变");
             Check(reborn.IsPaired(peerA.DeviceId), "重启后配对关系恢复");
-            var rebornConversation = reborn.GetConversation(peerA.DeviceId, peerA.DeviceName);
+            var rebornConversation = reborn.GetConversation(peerA.DeviceId);
             Check(rebornConversation.Count == bMessageCount && bMessageCount > 5, $"重启后会话记录恢复（{rebornConversation.Count} 条）");
-            Check(reborn.KnownDevices.Any(device => device.Id == peerA.DeviceId), "重启后名册里仍有这台设备（离线也保留）");
+            Check(reborn.Friends.Any(friend => friend.Id == peerA.DeviceId), "重启后名册里仍有这台设备（离线也保留）");
+            Check(reborn.Friends.First(friend => friend.Id == peerA.DeviceId).Alias == "办公室的 Mac", "重启后别名还在");
+            Check(reborn.DisplayName(peerA.DeviceId, "x") == "办公室的 Mac", "重启后仍优先显示别名");
             Check(reborn.ReceiveDir == bReceiveDir, "重启后接收目录恢复");
         }
 
