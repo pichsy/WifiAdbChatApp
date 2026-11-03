@@ -747,6 +747,21 @@ struct LANTransferView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: outgoing ? .trailing : .leading)
+        .contextMenu { messageContextMenu(message) }
+    }
+
+    @ViewBuilder
+    private func messageContextMenu(_ message: LANMessage) -> some View {
+        let missing = model.fileMissing(message)
+        if message.kind == .text {
+            Button("复制文字") { model.copyText(message) }
+        } else {
+            Button("查看") { model.previewFile(message) }
+                .disabled(missing)
+            Button(missing ? "打开接收目录" : "打开文件位置") {
+                model.openFileLocation(message)
+            }
+        }
     }
 
     private func bubbleAvatar(systemName: String, outgoing: Bool, peerName: String?) -> some View {
@@ -768,46 +783,50 @@ struct LANTransferView: View {
             ? Color.accentColor.opacity(0.15)
             : Color.primary.opacity(0.055)
         let radius: CGFloat = 11
+        let missing = message.kind == .file ? model.fileMissing(message) : false
 
         if message.kind == .text {
             Text(message.text ?? "")
                 .font(.callout)
-                .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 11)
                 .padding(.vertical, 8)
                 .background(
                     RoundedRectangle(cornerRadius: radius, style: .continuous).fill(fill)
                 )
-                .contextMenu {
-                    Button("复制文字") { model.copyText(message) }
-                }
+                .contextMenu { messageContextMenu(message) }
         } else {
             HStack(spacing: 9) {
-                Image(systemName: "doc.fill")
+                Image(systemName: missing ? "doc.badge.xmark" : "doc.fill")
                     .font(.title3)
-                    .foregroundStyle(outgoing ? Color.accentColor : Color.secondary)
+                    .foregroundStyle(missing ? Color.secondary : (outgoing ? Color.accentColor : Color.secondary))
                 VStack(alignment: .leading, spacing: 1) {
                     Text(message.fileName ?? "文件")
                         .font(.callout)
                         .lineLimit(2)
                         .truncationMode(.middle)
+                        .strikethrough(missing)
+                        .foregroundStyle(missing ? Color.secondary : Color.primary)
                     HStack(spacing: 6) {
                         if let size = message.fileSize, size > 0 {
                             Text(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))
                         }
-                        Text(outgoing ? "已发送" : "已保存")
+                        Text(missing ? "文件已不存在" : (outgoing ? "已发送" : "已保存"))
                     }
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(missing ? Color.orange : Color.secondary)
                 }
                 Spacer(minLength: 4)
-                Button(outgoing ? "打开" : "显示") {
-                    model.revealFile(message)
+                Button(missing ? "打开目录" : (outgoing ? "打开" : "显示")) {
+                    if missing {
+                        model.openFileLocation(message)
+                    } else {
+                        model.revealFile(message)
+                    }
                 }
                 .buttonStyle(.borderless)
                 .font(.caption)
-                .help(message.filePath ?? "")
+                .help(missing ? "文件已不存在，打开接收目录" : (message.filePath ?? ""))
             }
             .frame(maxWidth: 360, alignment: .leading)
             .padding(.horizontal, 11)
@@ -815,9 +834,6 @@ struct LANTransferView: View {
             .background(
                 RoundedRectangle(cornerRadius: radius, style: .continuous).fill(fill)
             )
-            .contextMenu {
-                Button("在访达中显示") { model.revealFile(message) }
-            }
         }
     }
 

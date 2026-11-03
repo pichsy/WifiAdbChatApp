@@ -1788,12 +1788,52 @@ final class LANModel: ObservableObject {
         statusText = "已复制到剪贴板"
     }
 
+    /// 文件消息对应的文件是否已经不在本地
+    func fileMissing(_ message: LANMessage) -> Bool {
+        guard message.kind == .file, let path = message.filePath, !path.isEmpty else { return true }
+        return !FileManager.default.fileExists(atPath: path)
+    }
+
+    /// 打开接收目录（文件已不存在时，右键「打开接收目录」走这里）
+    func openReceiveDirectory() {
+        let dir = URL(fileURLWithPath: receiveDir, isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(dir)
+    }
+
+    /// 查看文件：用系统默认 App 打开（图片 / 视频等）
+    func previewFile(_ message: LANMessage) {
+        guard let path = message.filePath, !path.isEmpty else { return }
+        guard FileManager.default.fileExists(atPath: path) else {
+            statusKind = .failure
+            statusText = "文件已经不在了：\(path)"
+            return
+        }
+        NSWorkspace.shared.open(URL(fileURLWithPath: path))
+    }
+
+    /// 打开文件所在位置；文件不在时退回到接收目录
+    func openFileLocation(_ message: LANMessage) {
+        guard let path = message.filePath, !path.isEmpty else {
+            openReceiveDirectory()
+            return
+        }
+        guard FileManager.default.fileExists(atPath: path) else {
+            statusKind = .idle
+            statusText = "文件已经不在了，已打开接收目录"
+            openReceiveDirectory()
+            return
+        }
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+    }
+
     func revealFile(_ message: LANMessage) {
         guard let path = message.filePath else { return }
         let url = URL(fileURLWithPath: path)
         guard FileManager.default.fileExists(atPath: path) else {
-            statusKind = .failure
-            statusText = "文件已经不在了：\(path)"
+            statusKind = .idle
+            statusText = "文件已经不在了，已打开接收目录"
+            openReceiveDirectory()
             return
         }
         if message.direction == .incoming {
