@@ -1,14 +1,16 @@
 # 发布安装包
 
-正式发布的 macOS 安装包统一放在这里，方便直接从仓库下载。
+正式发布的安装包统一放在这里，方便直接从仓库下载。
 
-| 版本 | 文件 | 大小 | 构建日期 | SHA-256 |
+| 平台 | 版本 | 文件 | 大小 | SHA-256 |
 | --- | --- | --- | --- | --- |
-| 1.6 | [文件互传助手-1.6.dmg](文件互传助手-1.6.dmg) | 3.4 MB | 2026-11-03 | `80ee6b3c5da2107e6194b6160d9bf982087b3de908edc59fa35cbcf88989d69e` |
+| macOS | 1.6 | [文件互传助手-1.6.dmg](文件互传助手-1.6.dmg) | 3.4 MB | `80ee6b3c5da2107e6194b6160d9bf982087b3de908edc59fa35cbcf88989d69e` |
+| Windows | 1.2.0 | [文件互传助手-1.2.0-安装包.exe](文件互传助手-1.2.0-安装包.exe) | 28 MB | `5b6a8dc56a6db89cb171ecc8dceac6562c639d6a83dd0b35c05ec3bca68664f1` |
 
-> 对应源码提交：`751dab1`。校验值也可在 [SHA256SUMS.txt](SHA256SUMS.txt) 里查到。
+> macOS 包对应源码提交 `751dab1`；Windows 安装包由 `windows/build-release.ps1` 生成
+> （内置 .NET 8 运行时，目标机器无需安装 .NET）。校验值也可在 [SHA256SUMS.txt](SHA256SUMS.txt) 里查到。
 
-## 安装
+## macOS 安装
 
 1. 下载 dmg 后双击挂载。
 2. 把「文件互传助手.app」拖进「应用程序」；如果之前装过旧版，选择**替换**（旧版的
@@ -17,9 +19,19 @@
    `授权并安装.sh`；macOS 15+ 也可以在「系统设置 → 隐私与安全性」点「仍要打开」。
 4. 第一次使用「电脑设备」页时，按提示允许**本地网络**权限。
 
+## Windows 安装
+
+1. 双击 `文件互传助手-1.2.0-安装包.exe`。
+2. 按向导走完：欢迎页 → 选择安装位置（默认 `%LOCALAPPDATA%\Programs\文件互传助手`，
+   **不需要管理员权限**）→ 安装。
+3. 完成页默认勾选 **创建桌面快捷方式**（以及「立即运行 文件互传助手」），按需取消后点「完成」。
+4. 首次运行请在 Windows 防火墙放行「专用网络」（发现 UDP 52730 + 随机 TCP 传输端口）。
+
+静默安装、卸载、SmartScreen 提示等细节见 [安装说明.md](安装说明.md)。
+
 ## 说明
 
-- 支持 macOS 13+，通用二进制（Apple 芯片 / Intel）。
-- 未做 Apple 开发者签名和公证，安装说明与一键安装脚本都在 dmg 内。
-- 更新内容见根目录 [README](../README.md) 和 [macOS README](../macos/README.md) 的「更新记录」。
-- 构建产物目录 `macos/dist/` 不进 git；`release/` 只存正式发布的安装包。
+- macOS 支持 macOS 13+，通用二进制（Apple 芯片 / Intel）；Windows 支持 Windows 10 1809+ / 11 x64。
+- 两端都未做代码签名 / 公证，首次打开可能被 Gatekeeper / SmartScreen 拦截，按上面的说明放行即可。
+- 更新内容见根目录 [README](../README.md) 和各端 README 的更新记录。
+- `release/` 只存正式发布的安装包；macOS `macos/dist/`、Windows `windows/publish/` 等中间产物都不进 git。
