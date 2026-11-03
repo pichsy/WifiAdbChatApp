@@ -925,7 +925,15 @@ internal sealed class FriendStore
                 changed = true;
             }
 
-            record.LastSeenUtc = DateTime.UtcNow;
+            // 心跳每 2 秒一次，不能每次都写盘；但「上次在线」也不能永远停在旧值，
+            // 所以超过一分钟就落一次盘——重启后显示的时间不会太离谱。
+            var now = DateTime.UtcNow;
+            if (now - record.LastSeenUtc > TimeSpan.FromMinutes(1))
+            {
+                changed = true;
+            }
+
+            record.LastSeenUtc = now;
             if (changed)
             {
                 SaveLocked();
