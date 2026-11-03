@@ -32,6 +32,9 @@ public partial class MainWindow : Window
 
         _viewModel.Messages.CollectionChanged += OnMessagesChanged;
 
+        // 切回窗口时重新核对文件是否还在：在资源管理器里删掉的文件要立刻显示删除线。
+        Activated += (_, _) => _viewModel.RefreshFileStates();
+
         // 用隧道阶段拦截 Enter，避免多行 TextBox 先插入换行。
         InputBox.AddHandler(KeyDownEvent, OnInputKeyDown, RoutingStrategies.Tunnel);
 
@@ -563,32 +566,50 @@ public partial class MainWindow : Window
     {
         if (sender is Control control && control.DataContext is MessageItemViewModel message)
         {
-            RevealMessageFile(message);
+            message.RefreshFileState();
+            OpenMessageLocation(message, preferOpenFile: message.IsOutgoing);
         }
     }
 
-    private void RevealMessageFile(MessageItemViewModel message)
+    /// <summary>
+    /// 打开这条记录对应的位置。文件还在就打开/定位它；文件没了就退到它的父目录；
+    /// 连父目录都没了（U 盘拔了、整个文件夹删了），再退到设置里的接收目录。
+    /// </summary>
+    private void OpenMessageLocation(MessageItemViewModel message, bool preferOpenFile)
     {
         var path = message.Message.FilePath;
-        if (string.IsNullOrEmpty(path))
-        {
-            return;
-        }
 
-        if (!File.Exists(path))
+        if (!string.IsNullOrEmpty(path) && File.Exists(path))
         {
-            _viewModel.ReportMissingFile(path);
-            return;
-        }
+            var ok = preferOpenFile && ShellLauncher.TryOpenFile(path)
+                || ShellLauncher.TryRevealFile(path);
+            if (ok)
+            {
+                return;
+            }
 
-        var ok = message.IsOutgoing
-            ? ShellLauncher.TryOpenFile(path)
-            : ShellLauncher.TryRevealFile(path);
-
-        if (!ok)
-        {
             _viewModel.SetLocalFailure($"打不开文件：{path}");
+            return;
         }
+
+        var directory = string.IsNullOrEmpty(path) ? null : Path.GetDirectoryName(path);
+        if (directory is not null && Directory.Exists(directory) && ShellLauncher.TryOpenDirectory(directory))
+        {
+            _viewModel.SetStatusNote($"文件已被删除，已打开它原来的目录：{directory}");
+            return;
+        }
+
+        var receiveDir = _viewModel.ReceiveDir;
+        if (!string.IsNullOrEmpty(receiveDir) && ShellLauncher.TryOpenDirectory(receiveDir))
+        {
+            _viewModel.SetStatusNote(
+                string.IsNullOrEmpty(path)
+                    ? $"已打开接收目录：{receiveDir}"
+                    : $"文件和原目录都不在了，已打开接收目录：{receiveDir}");
+            return;
+        }
+
+        _viewModel.ReportMissingFile(path ?? receiveDir ?? "(未知路径)");
     }
 
     /// <summary>
@@ -613,29 +634,34 @@ public partial class MainWindow : Window
         else
         {
             var open = new MenuItem { Header = "打开文件", IsEnabled = exists };
-            open.Click += (_, _) =>
-            {
-                if (!ShellLauncher.TryOpenFile(path!))
-                {
-                    _viewModel.SetLocalFailure($"打不开文件：{path}");
-                }
-            };
+            open.Click += (_, _) => OpenMessageLocation(message, preferOpenFile: true);
             items.Add(open);
 
-            var reveal = new MenuItem { Header = "在文件夹中显示", IsEnabled = exists };
-            reveal.Click += (_, _) => RevealMessageFile(message);
+            var directory = string.IsNullOrEmpty(path) ? null : Path.GetDirectoryName(path);
+            var directoryExists = directory is not null && Directory.Exists(directory);
+
+            // 文件没了也不是死路：优先它原来的目录，再退到设置里的接收目录。
+            var revealHeader = exists
+                ? "在文件夹中显示"
+                : directoryExists ? "打开它原来的文件夹" : "打开接收目录";
+            var reveal = new MenuItem { Header = revealHeader };
+            reveal.Click += (_, _) => OpenMessageLocation(message, preferOpenFile: false);
             items.Add(reveal);
 
-            var folder = new MenuItem { Header = "打开所在文件夹", IsEnabled = exists };
-            folder.Click += (_, _) =>
+            var receiveDir = _viewModel.ReceiveDir;
+            var receiveItem = new MenuItem
             {
-                var directory = Path.GetDirectoryName(path!);
-                if (directory is null || !ShellLauncher.TryOpenDirectory(directory))
+                Header = "打开接收目录",
+                IsEnabled = !string.IsNullOrEmpty(receiveDir) && Directory.Exists(receiveDir),
+            };
+            receiveItem.Click += (_, _) =>
+            {
+                if (!ShellLauncher.TryOpenDirectory(receiveDir!))
                 {
-                    _viewModel.SetLocalFailure($"打不开文件夹：{directory ?? path}");
+                    _viewModel.SetLocalFailure($"打不开接收目录：{receiveDir}");
                 }
             };
-            items.Add(folder);
+            items.Add(receiveItem);
 
             items.Add(new Separator());
 
@@ -646,13 +672,6 @@ public partial class MainWindow : Window
             var copyPath = new MenuItem { Header = "复制文件路径", IsEnabled = !string.IsNullOrEmpty(path) };
             copyPath.Click += async (_, _) => await CopyTextAsync(path ?? string.Empty);
             items.Add(copyPath);
-
-            if (!exists)
-            {
-                var missing = new MenuItem { Header = "文件已不在磁盘上", IsEnabled = false };
-                items.Add(new Separator());
-                items.Add(missing);
-            }
         }
 
         items.Add(new Separator());
@@ -698,6 +717,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        message.RefreshFileState();
         var flyout = new MenuFlyout();
         BuildMessageMenu(flyout.Items, message);
         flyout.ShowAt(control);

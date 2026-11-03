@@ -1,14 +1,58 @@
 using ADBTypeLink.Core;
 using Avalonia.Layout;
+using Avalonia.Media;
 
 namespace ADBTypeLink.App.ViewModels;
 
 /// <summary>聊天区里的一条消息（文字或文件卡片）。</summary>
-public sealed class MessageItemViewModel
+public sealed class MessageItemViewModel : ObservableObject
 {
+    private bool _fileMissing;
+
     public MessageItemViewModel(ChatMessage message)
     {
         Message = message;
+        RefreshFileState();
+    }
+
+    /// <summary>
+    /// 记录里的文件还在不在。文件被移走或删掉之后，这条记录要能看出来——
+    /// 否则点「打开」毫无反应，用户不知道是程序坏了还是文件没了。
+    /// </summary>
+    public bool FileMissing
+    {
+        get => _fileMissing;
+        private set
+        {
+            if (SetProperty(ref _fileMissing, value))
+            {
+                OnPropertyChanged(nameof(FileNameDecorations));
+                OnPropertyChanged(nameof(FileIconOpacity));
+                OnPropertyChanged(nameof(FileTextOpacity));
+                OnPropertyChanged(nameof(FileMeta));
+            }
+        }
+    }
+
+    /// <summary>文件没了就给文件名加删除线。</summary>
+    public TextDecorationCollection? FileNameDecorations =>
+        _fileMissing ? TextDecorations.Strikethrough : null;
+
+    /// <summary>删掉的文件整行淡一点，一眼能看出这条记录已经失效。</summary>
+    public double FileIconOpacity => _fileMissing ? 0.35 : 1;
+
+    public double FileTextOpacity => _fileMissing ? 0.6 : 1;
+
+    /// <summary>重新检查磁盘上的文件（右键菜单弹出前、切换会话时各调一次）。</summary>
+    public void RefreshFileState()
+    {
+        if (!IsFile)
+        {
+            FileMissing = false;
+            return;
+        }
+
+        FileMissing = string.IsNullOrEmpty(Message.FilePath) || !File.Exists(Message.FilePath);
     }
 
     public ChatMessage Message { get; }
@@ -47,7 +91,15 @@ public sealed class MessageItemViewModel
                 parts.Add(FormatSize(Message.FileSize.Value));
             }
 
-            parts.Add(IsOutgoing ? "已发送" : "已保存");
+            if (_fileMissing)
+            {
+                parts.Add("文件已删除");
+            }
+            else
+            {
+                parts.Add(IsOutgoing ? "已发送" : "已保存");
+            }
+
             return string.Join(" · ", parts);
         }
     }

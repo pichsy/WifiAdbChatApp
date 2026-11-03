@@ -615,6 +615,21 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     public void SetLocalFailure(string message) => ApplyStatus(new LinkStatus(LinkStatusKind.Failure, message));
 
+    /// <summary>给底部状态栏一条普通提示（比如「文件已删除，已打开原目录」）。</summary>
+    public void SetStatusNote(string message) => ApplyStatus(new LinkStatus(LinkStatusKind.Idle, message));
+
+    /// <summary>
+    /// 重新检查当前会话里每条文件记录是否还在磁盘上。窗口重新获得焦点时调一次，
+    /// 这样在资源管理器里删掉文件后切回来，删除线会立刻出现。
+    /// </summary>
+    public void RefreshFileStates()
+    {
+        foreach (var message in Messages)
+        {
+            message.RefreshFileState();
+        }
+    }
+
     // MARK: - 待发送文件操作
 
     public void AddStagedFiles(IEnumerable<string> paths)

@@ -419,10 +419,14 @@
                                              IsVisible="{Binding IsText}" Classes="bubbleText" />
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8"
                               IsVisible="{Binding IsFile}">
-                          <TextBlock Text="📄" FontSize="24" VerticalAlignment="Center" />
+                          <TextBlock Text="📄" FontSize="24" VerticalAlignment="Center"
+                                     Opacity="{Binding FileIconOpacity}" />
                           <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                            <!-- 文件被删掉的行，文件名加删除线 -->
                             <TextBlock Text="{Binding FileName}" TextWrapping="Wrap" MaxWidth="330"
-                                       Classes="bubbleText" />
+                                       Classes="bubbleText"
+                                       TextDecorations="{Binding FileNameDecorations}"
+                                       Opacity="{Binding FileTextOpacity}" />
                             <TextBlock Text="{Binding FileMeta}" Classes="metaDim" />
                           </StackPanel>
                           <Button Grid.Column="2" Classes="link" Content="{Binding OpenButtonText}"
