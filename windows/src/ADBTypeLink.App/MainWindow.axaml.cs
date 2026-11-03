@@ -35,6 +35,9 @@ public partial class MainWindow : Window
         // 用隧道阶段拦截 Enter，避免多行 TextBox 先插入换行。
         InputBox.AddHandler(KeyDownEvent, OnInputKeyDown, RoutingStrategies.Tunnel);
 
+        // 「移动设备」页：Enter 直接发到手机，和 macOS 端一致。
+        MobileInputBox.AddHandler(KeyDownEvent, OnMobileInputKeyDown, RoutingStrategies.Tunnel);
+
         DragDrop.SetAllowDrop(RootGrid, true);
         RootGrid.AddHandler(DragDrop.DragEnterEvent, OnDragEnter);
         RootGrid.AddHandler(DragDrop.DragOverEvent, OnDragOver);
@@ -126,6 +129,15 @@ public partial class MainWindow : Window
         Dispatcher.UIThread.Post(Attempt, DispatcherPriority.Loaded);
     }
 
+    /// <summary>截图 / 自动化用：切到指定页签（0 移动设备，1 电脑设备）。</summary>
+    public void SelectTab(int index)
+    {
+        if (MainTabs is not null && index >= 0 && index < MainTabs.ItemCount)
+        {
+            MainTabs.SelectedIndex = index;
+        }
+    }
+
     /// <summary>截图 / 调试用：立即把消息列表定位到底部。</summary>
     public void PrepareForScreenshot()
     {
@@ -202,6 +214,11 @@ public partial class MainWindow : Window
                 return;
             }
 
+            if (outcome.IsCancelled)
+            {
+                return;
+            }
+
             if (outcome.Status == SendStatus.NeedsPairing)
             {
                 await RunPairingLoopAsync(
@@ -220,6 +237,49 @@ public partial class MainWindow : Window
     private async void OnSendFiles(object? sender, RoutedEventArgs e)
     {
         await SendFilesFlowAsync();
+    }
+
+    private void OnCancelSend(object? sender, RoutedEventArgs e)
+    {
+        _viewModel.CancelSend();
+    }
+
+    private void OnDismissSendError(object? sender, RoutedEventArgs e)
+    {
+        _viewModel.DismissSendError();
+    }
+
+    private void OnOpenLogFile(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            // 没有日志文件时先写一行，避免打开一个不存在的路径。
+            if (!File.Exists(AppLog.FilePath))
+            {
+                AppLog.Write("log opened by user");
+            }
+
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("notepad.exe", $"\"{AppLog.FilePath}\"")
+            {
+                UseShellExecute = false,
+            });
+        }
+        catch (Exception exception)
+        {
+            _viewModel.SetLocalFailure($"打不开日志文件：{exception.Message}");
+        }
+    }
+
+    private async void OnReconnectSelected(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await _viewModel.ReconnectSelectedAsync();
+        }
+        catch (Exception exception)
+        {
+            _viewModel.SetLocalFailure($"重新连接失败：{exception.Message}");
+        }
     }
 
     private async Task SendFilesFlowAsync()
@@ -244,6 +304,11 @@ public partial class MainWindow : Window
             if (outcome.IsOk)
             {
                 _viewModel.ClearStagedFiles();
+                return;
+            }
+
+            if (outcome.IsCancelled)
+            {
                 return;
             }
 
@@ -284,6 +349,11 @@ public partial class MainWindow : Window
             if (outcome.IsOk)
             {
                 onSuccess?.Invoke();
+                return;
+            }
+
+            if (outcome.IsCancelled)
+            {
                 return;
             }
 
@@ -573,6 +643,155 @@ public partial class MainWindow : Window
         catch (Exception exception)
         {
             _viewModel.SetLocalFailure($"拖拽文件失败：{exception.Message}");
+        }
+    }
+
+    // MARK: - 移动设备（adb）
+
+    private void OnMobileInputKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        _ = _viewModel.Mobile.SendTextAsync();
+    }
+
+    private async void OnMobileRefresh(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await _viewModel.Mobile.RefreshDevicesAsync(silent: false);
+        }
+        catch (Exception exception)
+        {
+            _viewModel.Mobile.SetStatus(LinkStatusKind.Failure, $"刷新设备失败：{exception.Message}");
+        }
+    }
+
+    private async void OnMobileSend(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await _viewModel.Mobile.SendTextAsync();
+        }
+        catch (Exception exception)
+        {
+            _viewModel.Mobile.SetStatus(LinkStatusKind.Failure, $"发送失败：{exception.Message}");
+        }
+    }
+
+    private void OnMobileClearInput(object? sender, RoutedEventArgs e) => _viewModel.Mobile.Input = string.Empty;
+
+    private void OnMobileClearHistory(object? sender, RoutedEventArgs e) => _viewModel.Mobile.ClearHistory();
+
+    private void OnMobileUseHistory(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control control && control.DataContext is string text)
+        {
+            _viewModel.Mobile.UseHistory(text);
+        }
+    }
+
+    private void OnMobileResetTargetDir(object? sender, RoutedEventArgs e) => _viewModel.Mobile.ResetTargetDir();
+
+    private void OnMobileRemoveFile(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control control && control.DataContext is MobileFileItem item)
+        {
+            _viewModel.Mobile.RemoveFile(item);
+        }
+    }
+
+    private void OnMobileClearFiles(object? sender, RoutedEventArgs e) => _viewModel.Mobile.ClearFiles();
+
+    private async void OnMobilePush(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await _viewModel.Mobile.PushFilesAsync();
+        }
+        catch (Exception exception)
+        {
+            _viewModel.Mobile.SetStatus(LinkStatusKind.Failure, $"传输失败：{exception.Message}");
+        }
+    }
+
+    private async void OnMobileChooseFiles(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var storage = GetTopLevel(this)?.StorageProvider;
+            if (storage is null)
+            {
+                return;
+            }
+
+            var files = await storage.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "选择要传到手机的文件",
+                AllowMultiple = true,
+            });
+
+            var paths = files
+                .Select(file => file.TryGetLocalPath())
+                .Where(path => !string.IsNullOrEmpty(path))
+                .Select(path => path!)
+                .ToList();
+
+            _viewModel.Mobile.AddFiles(paths);
+        }
+        catch (Exception exception)
+        {
+            _viewModel.Mobile.SetStatus(LinkStatusKind.Failure, $"选择文件失败：{exception.Message}");
+        }
+    }
+
+    private async void OnMobileRestartAdb(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await _viewModel.Mobile.RestartAdbServerAsync();
+        }
+        catch (Exception exception)
+        {
+            _viewModel.Mobile.SetStatus(LinkStatusKind.Failure, $"重启 adb 失败：{exception.Message}");
+        }
+    }
+
+    private async void OnMobilePickAdb(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var storage = GetTopLevel(this)?.StorageProvider;
+            if (storage is null)
+            {
+                return;
+            }
+
+            var files = await storage.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "选择 adb 可执行文件",
+                AllowMultiple = false,
+                FileTypeFilter = new[]
+                {
+                    new FilePickerFileType("adb") { Patterns = new[] { "adb.exe", "adb" } },
+                },
+            });
+
+            var path = files.FirstOrDefault()?.TryGetLocalPath();
+            if (string.IsNullOrEmpty(path))
+            {
+                return;
+            }
+
+            _viewModel.Mobile.SetAdbPath(path);
+        }
+        catch (Exception exception)
+        {
+            _viewModel.Mobile.SetStatus(LinkStatusKind.Failure, $"设置 adb 失败：{exception.Message}");
         }
     }
 }

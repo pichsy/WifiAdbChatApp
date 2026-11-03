@@ -198,6 +198,7 @@
           <SolidColorBrush x:Key="DisabledBrush" Color="#D6D6DC" />
           <SolidColorBrush x:Key="SuccessBrush" Color="#1F8A4C" />
           <SolidColorBrush x:Key="FailureBrush" Color="#CC2F27" />
+          <SolidColorBrush x:Key="FailureTintBrush" Color="#14CC2F27" />
           <SolidColorBrush x:Key="WarningBrush" Color="#B26A00" />
           <SolidColorBrush x:Key="BadgePairedBrush" Color="#221F8A4C" />
           <SolidColorBrush x:Key="BadgeUnpairedBrush" Color="#22B26A00" />
@@ -225,6 +226,7 @@
           <SolidColorBrush x:Key="DisabledBrush" Color="#3A3A42" />
           <SolidColorBrush x:Key="SuccessBrush" Color="#4ED08A" />
           <SolidColorBrush x:Key="FailureBrush" Color="#FF6F66" />
+          <SolidColorBrush x:Key="FailureTintBrush" Color="#24FF6F66" />
           <SolidColorBrush x:Key="WarningBrush" Color="#FFB44D" />
           <SolidColorBrush x:Key="BadgePairedBrush" Color="#2E4ED08A" />
           <SolidColorBrush x:Key="BadgeUnpairedBrush" Color="#2EFFB44D" />

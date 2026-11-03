@@ -14,3 +14,7 @@ windows/dist/
 
 # 本地临时测试产物
 /tmp-recv/
+
+# 本机测试脚本与截图（生成物）
+/windows/artifacts/
+/windows/screenshots/

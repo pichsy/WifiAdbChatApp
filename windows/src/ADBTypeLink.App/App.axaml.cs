@@ -22,6 +22,9 @@ public partial class App : Application
     /// <summary>--demo-heavy：演示数据塞满聊天区，用来验证自动滚动到底部。</summary>
     public static bool DemoHeavy { get; set; }
 
+    /// <summary>--tab computers|mobile：启动时切到指定页签（截图 / 自动化核对用）。</summary>
+    public static string? StartTab { get; set; }
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -46,6 +49,15 @@ public partial class App : Application
                 : new MainWindow();
 
             desktop.MainWindow = window;
+
+            if (string.Equals(StartTab, "computers", StringComparison.OrdinalIgnoreCase))
+            {
+                window.SelectTab(1);
+            }
+            else if (string.Equals(StartTab, "mobile", StringComparison.OrdinalIgnoreCase))
+            {
+                window.SelectTab(0);
+            }
 
             if (ScreenshotPath is not null)
             {

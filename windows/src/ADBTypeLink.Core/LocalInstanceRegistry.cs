@@ -18,7 +18,7 @@ internal sealed class LocalInstanceRegistry : IDisposable
     private readonly string _instanceId;
     private readonly string _instanceName;
     private readonly Func<int> _portProvider;
-    private readonly Action<string>? _log;
+    private Action<string>? _log;
     private readonly string _directory;
     private readonly string _filePath;
 
@@ -34,6 +34,9 @@ internal sealed class LocalInstanceRegistry : IDisposable
         _directory = DefaultDirectory;
         _filePath = Path.Combine(_directory, Sanitize(instanceId) + ".json");
     }
+
+    /// <summary>运行期替换日志出口（应用启动后再挂文件日志时用）。</summary>
+    public void SetLog(Action<string>? log) => _log = log;
 
     /// <summary>本机实例注册目录（每个用户独立，Windows 在 %TEMP%，macOS 在 /var/folders/...）。</summary>
     public static string DefaultDirectory => Path.Combine(Path.GetTempPath(), "ADBTypeLink", "instances");
@@ -75,7 +78,7 @@ internal sealed class LocalInstanceRegistry : IDisposable
                 try
                 {
                     var info = new FileInfo(file);
-                    if ((now - info.LastWriteTimeUtc) > LinkProtocol.PeerTimeout)
+                    if ((now - info.LastWriteTimeUtc) > LinkProtocol.InstanceTimeout)
                     {
                         continue;
                     }

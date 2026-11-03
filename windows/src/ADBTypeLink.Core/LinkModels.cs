@@ -53,6 +53,13 @@ public sealed class ChatMessage
     [JsonPropertyName("direction")]
     public MessageDirection Direction { get; set; }
 
+    /// <summary>
+    /// 消息属于哪台设备（对端持久化 ID）。旧版本 chat.json 里没有这个字段，
+    /// 迁移时留空，之后按 PeerName 归到同名的设备会话里。
+    /// </summary>
+    [JsonPropertyName("peerId")]
+    public string PeerId { get; set; } = string.Empty;
+
     [JsonPropertyName("peerName")]
     public string PeerName { get; set; } = string.Empty;
 
@@ -75,6 +82,23 @@ public sealed class ChatMessage
     public long? FileSize { get; set; }
 }
 
+/// <summary>
+/// 记住过的设备：只要配对过或者有过消息来往，即使此刻离线也要留在列表里，
+/// 只是连接状态不同——它有自己的独立聊天记录。
+/// </summary>
+public sealed class KnownDevice
+{
+    public string Id { get; init; } = string.Empty;
+
+    public string Name { get; init; } = string.Empty;
+
+    /// <summary>最后一次有来往的时间（UTC）。</summary>
+    public DateTime LastSeenUtc { get; init; }
+
+    /// <summary>是否只是旧记录（没有设备 ID 的历史会话）。</summary>
+    public bool IsLegacy { get; init; }
+}
+
 public enum LinkStatusKind
 {
     Idle,
@@ -90,6 +114,9 @@ public enum SendStatus
     Ok,
     NeedsPairing,
     Failure,
+
+    /// <summary>用户主动取消了这次发送。</summary>
+    Cancelled,
 }
 
 /// <summary>一次发送动作的结果。</summary>
@@ -104,6 +131,8 @@ public sealed class SendOutcome
     public string? Message { get; init; }
 
     public bool IsOk => Status == SendStatus.Ok;
+
+    public bool IsCancelled => Status == SendStatus.Cancelled;
 
     public static SendOutcome Ok(string peerName, string message) => new()
     {
@@ -121,6 +150,12 @@ public sealed class SendOutcome
     public static SendOutcome Failure(string message) => new()
     {
         Status = SendStatus.Failure,
+        Message = message,
+    };
+
+    public static SendOutcome Cancelled(string message = "已取消发送") => new()
+    {
+        Status = SendStatus.Cancelled,
         Message = message,
     };
 }

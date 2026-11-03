@@ -13,11 +13,12 @@ public sealed class LinkEngine : IAsyncDisposable
 {
     private readonly LinkPaths _paths;
     private readonly PairedStore _paired;
-    private readonly ChatStore _chat;
+    private readonly ConversationStore _chats;
+    private readonly DeviceStore _devices;
     private readonly SettingsStore _settings;
     private readonly object _peersGate = new();
     private readonly Dictionary<string, LinkPeer> _peers = new(StringComparer.Ordinal);
-    private readonly Action<string>? _log;
+    private Action<string>? _log;
 
     private TcpListener? _listener;
     private Task? _acceptTask;
@@ -38,7 +39,8 @@ public sealed class LinkEngine : IAsyncDisposable
         DeviceId = Options.DeviceId ?? DeviceIdStore.LoadOrCreate(_paths.DeviceIdFile);
         DeviceName = Options.DeviceName ?? DeviceNameProvider.GetDefaultName();
         _paired = new PairedStore(_paths.PairedFile);
-        _chat = new ChatStore(_paths.ChatFile);
+        _chats = new ConversationStore(_paths.ChatsDirectory, _paths.ChatFile);
+        _devices = new DeviceStore(_paths.KnownDevicesFile);
         _settings = new SettingsStore(_paths.SettingsFile);
         _settings.Load();
         _receiveDir = Options.ReceiveDirectory ?? _settings.ReceiveDir ?? LinkPaths.DefaultReceiveDirectory();
@@ -46,6 +48,21 @@ public sealed class LinkEngine : IAsyncDisposable
     }
 
     public LinkEngineOptions Options { get; }
+
+    /// <summary>
+    /// 运行日志出口。应用启动后可以再设一遍（构造时的 Options.Log 只是初始值），
+    /// 出问题时把日志写入文件，用户把文件发回来就能定位。
+    /// </summary>
+    public Action<string>? LogSink
+    {
+        get => _log;
+        set
+        {
+            _log = value;
+            _discovery?.SetLog(value);
+            _localRegistry?.SetLog(value);
+        }
+    }
 
     /// <summary>本机设备 ID（持久化，重启不变）。</summary>
     public string DeviceId { get; }
@@ -71,8 +88,70 @@ public sealed class LinkEngine : IAsyncDisposable
 
     public LinkStatus Status => _status;
 
-    /// <summary>全部聊天记录快照。</summary>
-    public IReadOnlyList<ChatMessage> Messages => _chat.Snapshot();
+    /// <summary>
+    /// 某台设备的会话快照。每台设备一份独立缓存，切设备只换数据源，
+    /// 跟别的设备互不影响。
+    /// </summary>
+    public IReadOnlyList<ChatMessage> GetConversation(string peerId, string peerName) =>
+        _chats.SnapshotForPeer(peerId, peerName);
+
+    /// <summary>这台设备有没有留下过记录（决定它是否留在列表里）。</summary>
+    public bool HasConversation(string peerId, string peerName) =>
+        _chats.SnapshotForPeer(peerId, peerName).Count > 0;
+
+    /// <summary>
+    /// 记住过的设备：配对过的、有过来往的。即使此刻离线也要显示，
+    /// 只是状态不同，历史记录照常可看。
+    /// </summary>
+    public IReadOnlyList<KnownDevice> KnownDevices
+    {
+        get
+        {
+            var known = new List<KnownDevice>();
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var record in _devices.Snapshot())
+            {
+                names.Add(record.Name);
+                known.Add(new KnownDevice
+                {
+                    Id = record.Id,
+                    Name = record.Name,
+                    LastSeenUtc = record.LastSeenUtc,
+                });
+            }
+
+            // 已经在广播里出现的同名设备，它自己会带着旧记录展示
+            //（GetConversation 按名字合并），不能再补一台重复的设备。
+            foreach (var peer in Peers)
+            {
+                names.Add(peer.Name);
+            }
+
+            // 旧版本遗留的会话（没有设备 ID），按名字补成一台「离线设备」，
+            // 这样升级前收到的消息不会从列表里凭空消失。
+            foreach (var name in _chats.LegacyNames())
+            {
+                if (string.IsNullOrWhiteSpace(name) || !names.Add(name))
+                {
+                    continue;
+                }
+
+                var messages = _chats.Snapshot(ConversationStore.LegacyPrefix + name);
+                known.Add(new KnownDevice
+                {
+                    Id = ConversationStore.LegacyPrefix + name,
+                    Name = name,
+                    LastSeenUtc = messages.Count == 0
+                        ? DateTime.UtcNow
+                        : messages[^1].Date.UtcDateTime,
+                    IsLegacy = true,
+                });
+            }
+
+            return known;
+        }
+    }
 
     /// <summary>附近设备快照（按名称排序）。</summary>
     public IReadOnlyList<LinkPeer> Peers
@@ -92,7 +171,9 @@ public sealed class LinkEngine : IAsyncDisposable
 
     public event EventHandler<ChatMessage>? MessageAdded;
 
-    public event EventHandler? MessagesCleared;
+    /// <summary>某台设备的消息记录被清空（参数是 peerId）。</summary>
+    public event EventHandler<string>? ConversationCleared;
+
 
     /// <summary>已配对集合变化（新增 / 移除 / 清空）。</summary>
     public event EventHandler? PairingChanged;
@@ -254,11 +335,35 @@ public sealed class LinkEngine : IAsyncDisposable
         SetStatus(LinkStatusKind.Idle, "已清除配对记录，下次发送需要重新输入配对码");
     }
 
-    public void ClearMessages()
+    /// <summary>清空某台设备的消息记录，不影响别的设备。</summary>
+    public void ClearConversation(string peerId, string peerName)
     {
-        _chat.Clear();
-        MessagesCleared?.Invoke(this, EventArgs.Empty);
-        SetStatus(LinkStatusKind.Idle, "消息记录已清空，已收到的文件不会被删除");
+        if (!string.IsNullOrEmpty(peerId))
+        {
+            _chats.Clear(peerId);
+        }
+
+        if (!string.IsNullOrEmpty(peerName))
+        {
+            _chats.Clear(ConversationStore.LegacyPrefix + peerName);
+        }
+
+        ConversationCleared?.Invoke(this, peerId ?? string.Empty);
+        SetStatus(LinkStatusKind.Idle, $"已清空与「{peerName}」的消息记录，已收到的文件不会被删除");
+    }
+
+    /// <summary>彻底忘掉一台设备：取消配对 + 删掉名册记录。</summary>
+    public void ForgetDevice(string peerId, string peerName)
+    {
+        if (string.IsNullOrEmpty(peerId))
+        {
+            return;
+        }
+
+        _paired.Remove(peerId);
+        _devices.Remove(peerId);
+        PairingChanged?.Invoke(this, EventArgs.Empty);
+        SetStatus(LinkStatusKind.Idle, $"已取消与「{peerName}」的配对");
     }
 
     public void ReportCopied()
@@ -289,44 +394,43 @@ public sealed class LinkEngine : IAsyncDisposable
         SetStatus(LinkStatusKind.Idle, "正在连接…");
         progress?.Report(new SendProgress(0, "文字"));
 
+        var session = await OpenSessionAsync(peer, pairingCode, cancellationToken).ConfigureAwait(false);
+        if (!session.IsOk)
+        {
+            return session.Failure!;
+        }
+
+        await using var connection = session.Connection!;
         try
         {
-            await using var connection = await ConnectAsync(peer, cancellationToken).ConfigureAwait(false);
-            if (connection is null)
-            {
-                return FinishFailure(ConnectFailureText(peer));
-            }
-
-            var handshake = await HandshakeAsync(connection, peer, pairingCode, cancellationToken).ConfigureAwait(false);
-            if (handshake.Kind == HandshakeKind.NeedsPairing)
-            {
-                return FinishNeedsPairing(handshake.PeerName);
-            }
-
-            if (handshake.Kind == HandshakeKind.Failure)
-            {
-                return FinishFailure(handshake.Message);
-            }
-
             if (!await connection.WriteJsonAsync(LinkMessages.Text(text), cancellationToken).ConfigureAwait(false))
             {
-                return FinishFailure("发送文字失败，对方没有确认");
+                return FailOrCancel(cancellationToken, "连接已断开，文字没发出去，可以再点一次发送");
             }
 
             var response = await connection.ReadJsonAsync(cancellationToken).ConfigureAwait(false);
-            if (response is null || LinkProtocol.GetString(response.Value, "type") != "ok")
+            if (response is null)
             {
-                return FinishFailure("发送文字失败，对方没有确认");
+                return FailOrCancel(cancellationToken, "对方没有确认收到文字，网络中断了");
+            }
+
+            if (LinkProtocol.GetString(response.Value, "type") != "ok")
+            {
+                return FailOrCancel(cancellationToken, "对方没有确认收到文字");
             }
 
             await connection.WriteJsonAsync(LinkMessages.Bye(), cancellationToken).ConfigureAwait(false);
-            AppendOutgoingText(peer.Name, text);
+            AppendOutgoingText(peer.Id, peer.Name, text);
             return FinishOk(peer.Name, $"已把文字发送给 {peer.Name}");
+        }
+        catch (OperationCanceledException)
+        {
+            return FinishCancelled();
         }
         catch (Exception ex)
         {
             Log($"send text failed: {ex.Message}");
-            return FinishFailure("发送文字失败，对方没有确认");
+            return FailOrCancel(cancellationToken, "发送文字失败，网络中断了");
         }
     }
 
@@ -342,9 +446,27 @@ public sealed class LinkEngine : IAsyncDisposable
             return FinishFailure("先选择文件");
         }
 
-        SetStatus(LinkStatusKind.Idle, "正在连接…");
-        var currentCode = pairingCode;
+        // 先校验一遍文件，避免连上了才发现第三个文件读不到，白跑一趟。
+        foreach (var path in filePaths)
+        {
+            if (GetFileSize(path) <= 0)
+            {
+                return FinishFailure($"读不到文件：{Path.GetFileName(path)}");
+            }
+        }
 
+        SetStatus(LinkStatusKind.Idle, "正在连接…");
+
+        // 一次发送动作只建一条连接。原实现是每个文件单独连一次、单独握手一次，
+        // 批量发 10 个文件要建 10 条 TCP 连接，任何一次抖动整批都失败。
+        var session = await OpenSessionAsync(peer, pairingCode, cancellationToken).ConfigureAwait(false);
+        if (!session.IsOk)
+        {
+            return session.Failure!;
+        }
+
+        var connection = session.Connection!;
+        Log($"session open -> {peer.Name} {peer.Host}:{peer.Port}");
         try
         {
             for (var index = 0; index < filePaths.Count; index++)
@@ -362,53 +484,81 @@ public sealed class LinkEngine : IAsyncDisposable
                     return FinishFailure($"读不到文件：{name}");
                 }
 
-                progress?.Report(new SendProgress(
-                    filePaths.Count > 1 ? (double)index / filePaths.Count : 0,
-                    filePaths.Count > 1 ? $"{index + 1}/{filePaths.Count} {name}" : name));
+                var label = filePaths.Count > 1 ? $"{index + 1}/{filePaths.Count} {name}" : name;
+                var delivered = false;
 
-                await using var connection = await ConnectAsync(peer, cancellationToken).ConfigureAwait(false);
-                if (connection is null)
+                for (var attempt = 1; attempt <= LinkProtocol.FileAttempts; attempt++)
                 {
-                    return FinishFailure(ConnectFailureText(peer));
+                    if (attempt > 1)
+                    {
+                        var reopened = await ReopenForRetryAsync(peer, pairingCode, name, attempt, cancellationToken)
+                            .ConfigureAwait(false);
+                        if (reopened is null)
+                        {
+                            return FailOrCancel(cancellationToken, $"连接断了，「{name}」重连失败，没发完");
+                        }
+
+                        await connection.DisposeAsync().ConfigureAwait(false);
+                        connection = reopened;
+                    }
+
+                    progress?.Report(new SendProgress(
+                        filePaths.Count > 1 ? (double)index / filePaths.Count : 0,
+                        attempt == 1 ? label : $"{label}（重传 {attempt - 1}）"));
+
+                    if (!await connection.WriteJsonAsync(LinkMessages.File(name, size), cancellationToken).ConfigureAwait(false))
+                    {
+                        Log($"file header failed -> {name} attempt={attempt}");
+                        continue;
+                    }
+
+                    var (sentOk, sentBytes, reason, retryable) = await SendFileBytesAsync(
+                            connection, path, name, size, index, filePaths.Count, progress, cancellationToken)
+                        .ConfigureAwait(false);
+                    if (!sentOk)
+                    {
+                        Log($"file body aborted -> {name} {sentBytes}/{size} attempt={attempt}: {reason}");
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            return FinishCancelled();
+                        }
+
+                        if (!retryable || attempt == LinkProtocol.FileAttempts)
+                        {
+                            return FailOrCancel(cancellationToken, $"「{name}」没发完：{reason}");
+                        }
+
+                        continue;
+                    }
+
+                    var response = await connection.ReadJsonAsync(cancellationToken).ConfigureAwait(false);
+                    if (response is null || LinkProtocol.GetString(response.Value, "type") != "ok")
+                    {
+                        Log($"file ack missing -> {name} attempt={attempt}");
+                        if (attempt == LinkProtocol.FileAttempts)
+                        {
+                            return FailOrCancel(cancellationToken, "对方没有确认收到文件，网络可能中断了");
+                        }
+
+                        continue;
+                    }
+
+                    Log($"file ack ok -> {name} attempt={attempt}");
+                    delivered = true;
+                    break;
                 }
 
-                var handshake = await HandshakeAsync(connection, peer, currentCode, cancellationToken).ConfigureAwait(false);
-                if (handshake.Kind == HandshakeKind.NeedsPairing)
+                if (!delivered)
                 {
-                    return FinishNeedsPairing(handshake.PeerName);
+                    return FailOrCancel(cancellationToken, $"「{name}」重传 {LinkProtocol.FileAttempts} 次仍未发完");
                 }
-
-                if (handshake.Kind == HandshakeKind.Failure)
-                {
-                    return FinishFailure(handshake.Message);
-                }
-
-                // 一次发送动作只在第一个文件上带配对码。
-                currentCode = null;
-
-                if (!await connection.WriteJsonAsync(LinkMessages.File(name, size), cancellationToken).ConfigureAwait(false))
-                {
-                    return FinishFailure("发送文件信息失败");
-                }
-
-                if (!await SendFileBytesAsync(connection, path, name, size, index, filePaths.Count, progress, cancellationToken)
-                        .ConfigureAwait(false))
-                {
-                    return FinishFailure("网络中断，文件没发完");
-                }
-
-                var response = await connection.ReadJsonAsync(cancellationToken).ConfigureAwait(false);
-                if (response is null || LinkProtocol.GetString(response.Value, "type") != "ok")
-                {
-                    return FinishFailure("对方没有确认收到文件");
-                }
-
-                await connection.WriteJsonAsync(LinkMessages.Bye(), cancellationToken).ConfigureAwait(false);
             }
+
+            await connection.WriteJsonAsync(LinkMessages.Bye(), cancellationToken).ConfigureAwait(false);
 
             foreach (var path in filePaths)
             {
-                AppendOutgoingFile(peer.Name, path);
+                AppendOutgoingFile(peer.Id, peer.Name, path);
             }
 
             var successText = filePaths.Count == 1
@@ -417,11 +567,47 @@ public sealed class LinkEngine : IAsyncDisposable
             progress?.Report(new SendProgress(1, filePaths.Count == 1 ? Path.GetFileName(filePaths[0]) : "完成"));
             return FinishOk(peer.Name, successText);
         }
+        catch (OperationCanceledException)
+        {
+            return FinishCancelled();
+        }
         catch (Exception ex)
         {
             Log($"send files failed: {ex.Message}");
-            return FinishFailure("网络中断，文件没发完");
+            return FailOrCancel(cancellationToken, "网络中断，文件没发完");
         }
+        finally
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>文件传输出错后，重开一条会话继续重传。</summary>
+    private async Task<TcpConnection?> ReopenForRetryAsync(
+        LinkPeer peer,
+        string? code,
+        string fileName,
+        int attempt,
+        CancellationToken cancellationToken)
+    {
+        SetStatus(LinkStatusKind.Idle, $"连接中断，正在重传「{fileName}」…");
+        try
+        {
+            await Task.Delay(400 * (attempt - 1), cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
+
+        var session = await OpenSessionAsync(peer, code, cancellationToken).ConfigureAwait(false);
+        if (!session.IsOk)
+        {
+            return null;
+        }
+
+        Log($"session reopened -> {peer.Name} attempt={attempt}");
+        return session.Connection;
     }
 
     /// <summary>主动配对：只握手，不发送内容。</summary>
@@ -442,21 +628,17 @@ public sealed class LinkEngine : IAsyncDisposable
 
         try
         {
-            await using var connection = await ConnectAsync(peer, cancellationToken).ConfigureAwait(false);
-            if (connection is null)
+            var session = await OpenSessionAsync(peer, value, cancellationToken).ConfigureAwait(false);
+            if (!session.IsOk)
             {
-                return FinishFailure(ConnectFailureText(peer));
+                // 配对流程里 NeedsPairing 就是「码不对」，换成这句更直接。
+                var failure = session.Failure!;
+                return failure.Status == SendStatus.NeedsPairing
+                    ? FinishFailure("配对码不对，再看一眼对方屏幕上显示的数字")
+                    : failure;
             }
 
-            var handshake = await HandshakeAsync(connection, peer, value, cancellationToken).ConfigureAwait(false);
-            switch (handshake.Kind)
-            {
-                case HandshakeKind.NeedsPairing:
-                    return FinishFailure("配对码不对，再看一眼对方屏幕上显示的数字");
-                case HandshakeKind.Failure:
-                    return FinishFailure(handshake.Message);
-            }
-
+            await using var connection = session.Connection!;
             await connection.WriteJsonAsync(LinkMessages.Bye(), cancellationToken).ConfigureAwait(false);
             return FinishOk(peer.Name, $"已与「{peer.Name}」配对，可以直接发送文字和文件");
         }
@@ -476,7 +658,14 @@ public sealed class LinkEngine : IAsyncDisposable
         Failure,
     }
 
-    private readonly record struct HandshakeResult(HandshakeKind Kind, string Message, string PeerName);
+    private readonly record struct HandshakeResult(HandshakeKind Kind, string Message, string PeerName)
+    {
+        /// <summary>
+        /// 断链类失败（写不出去 / 等不到回应）值得重连一次；
+        /// 配对码不对、协议不匹配这类重连也没用，不能白白让用户多等。
+        /// </summary>
+        public bool Retryable { get; init; }
+    }
 
     private async Task<HandshakeResult> HandshakeAsync(
         TcpConnection connection,
@@ -486,20 +675,20 @@ public sealed class LinkEngine : IAsyncDisposable
     {
         if (!await connection.WriteJsonAsync(LinkMessages.Hello(DeviceId, DeviceName, code), cancellationToken).ConfigureAwait(false))
         {
-            return new HandshakeResult(HandshakeKind.Failure, "对方没有响应", string.Empty);
+            return new HandshakeResult(HandshakeKind.Failure, "对方没有响应", string.Empty) { Retryable = true };
         }
 
         var response = await connection.ReadJsonAsync(cancellationToken).ConfigureAwait(false);
         if (response is null)
         {
-            return new HandshakeResult(HandshakeKind.Failure, "对方没有响应", string.Empty);
+            return new HandshakeResult(HandshakeKind.Failure, "对方没有响应", string.Empty) { Retryable = true };
         }
 
         var type = LinkProtocol.GetString(response.Value, "type");
         switch (type)
         {
             case "hello_ok":
-                RememberPaired(peer.Id);
+                RememberPaired(peer.Id, peer.Name);
                 return new HandshakeResult(HandshakeKind.Ok, string.Empty, peer.Name);
 
             case "pair_required":
@@ -521,11 +710,174 @@ public sealed class LinkEngine : IAsyncDisposable
         }
     }
 
-    private static async Task<TcpConnection?> ConnectAsync(LinkPeer peer, CancellationToken cancellationToken)
+    private enum ConnectFailure
+    {
+        None,
+        Refused,
+        Timeout,
+        InvalidTarget,
+        Cancelled,
+    }
+
+    /// <summary>已建立并握手完成的会话；失败时带着可直接反馈给 UI 的结果。</summary>
+    private readonly record struct SessionResult(TcpConnection? Connection, SendOutcome? Failure)
+    {
+        public bool IsOk => Connection is not null;
+
+        public static SessionResult Ok(TcpConnection connection) => new(connection, null);
+
+        public static SessionResult Failed(SendOutcome failure) => new(null, failure);
+    }
+
+    /// <summary>
+    /// 建立 TCP 连接，带重试与总预算。
+    /// 原实现只连一次、单一 6 秒超时：Wi-Fi 抖一下、ARP 还没解析、对端刚重启，
+    /// 用户立刻看到「连不上」，而且没有任何重连——这就是「动不动断链」的直接来源。
+    /// </summary>
+    private static async Task<(TcpConnection? Connection, ConnectFailure Reason)> ConnectAsync(
+        LinkPeer peer,
+        CancellationToken cancellationToken)
     {
         if (!IPAddress.TryParse(peer.Host, out var address) || peer.Port is <= 0 or > 65535)
         {
-            return null;
+            return (null, ConnectFailure.InvalidTarget);
+        }
+
+        var endpoint = new IPEndPoint(address, peer.Port);
+        var deadline = DateTime.UtcNow + LinkProtocol.ConnectBudget;
+        var reason = ConnectFailure.Timeout;
+
+        for (var attempt = 0; attempt < LinkProtocol.ConnectAttempts; attempt++)
+        {
+            var remaining = deadline - DateTime.UtcNow;
+            if (remaining <= TimeSpan.Zero)
+            {
+                break;
+            }
+
+            var attemptTimeout = remaining < LinkProtocol.ConnectTimeout ? remaining : LinkProtocol.ConnectTimeout;
+            var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            try
+            {
+                using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeoutSource.CancelAfter(attemptTimeout);
+                await socket.ConnectAsync(endpoint, timeoutSource.Token).ConfigureAwait(false);
+                return (new TcpConnection(socket), ConnectFailure.None);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                socket.Dispose();
+                return (null, ConnectFailure.Cancelled);
+            }
+            catch (SocketException ex)
+            {
+                socket.Dispose();
+                reason = ex.SocketErrorCode == SocketError.ConnectionRefused
+                    ? ConnectFailure.Refused
+                    : ConnectFailure.Timeout;
+            }
+            catch (Exception)
+            {
+                socket.Dispose();
+                reason = ConnectFailure.Timeout;
+            }
+
+            // 端口明确关闭只做一次很短的补试（应用重启通常就一两百毫秒）；
+            // 再久就是真没开，不能把用户晾在「正在连接」上。
+            if (reason == ConnectFailure.Refused && attempt >= 1)
+            {
+                break;
+            }
+
+            var backoff = TimeSpan.FromMilliseconds(150 * Math.Pow(2, attempt));
+            if (DateTime.UtcNow + backoff >= deadline)
+            {
+                break;
+            }
+
+            try
+            {
+                await Task.Delay(backoff, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return (null, ConnectFailure.Cancelled);
+            }
+        }
+
+        return (null, reason);
+    }
+
+    /// <summary>
+    /// 建立一条已握手的会话。连接或握手阶段掉线会自动重连一轮；
+    /// 配对码错误、协议不匹配这类「重试也没用」的失败立即返回。
+    /// </summary>
+    private async Task<SessionResult> OpenSessionAsync(
+        LinkPeer peer,
+        string? code,
+        CancellationToken cancellationToken)
+    {
+        var lastReason = ConnectFailure.Timeout;
+        var lastHandshake = default(HandshakeResult);
+        var handshakeFailed = false;
+
+        for (var round = 0; round < LinkProtocol.SendRounds; round++)
+        {
+            if (round > 0)
+            {
+                SetStatus(LinkStatusKind.Idle, $"连接中断，正在重连 {peer.Name}…");
+            }
+
+            var (connection, reason) = await ConnectAsync(peer, cancellationToken).ConfigureAwait(false);
+            if (connection is null)
+            {
+                // ConnectAsync 内部已经重试过整轮了，这里再套一层只会让用户白等一倍时间。
+                lastReason = reason;
+                break;
+            }
+
+            var handshake = await HandshakeAsync(connection, peer, code, cancellationToken).ConfigureAwait(false);
+            switch (handshake.Kind)
+            {
+                case HandshakeKind.Ok:
+                    return SessionResult.Ok(connection);
+
+                case HandshakeKind.NeedsPairing:
+                    await connection.DisposeAsync().ConfigureAwait(false);
+                    return SessionResult.Failed(FinishNeedsPairing(handshake.PeerName));
+
+                default:
+                    await connection.DisposeAsync().ConfigureAwait(false);
+                    if (!handshake.Retryable)
+                    {
+                        return SessionResult.Failed(FinishFailure(handshake.Message));
+                    }
+
+                    lastHandshake = handshake;
+                    handshakeFailed = true;
+                    break;
+            }
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return SessionResult.Failed(FinishCancelled());
+        }
+
+        Log($"session failed -> {peer.Name} {peer.Host}:{peer.Port} handshake={handshakeFailed} reason={lastReason}");
+        return SessionResult.Failed(FinishFailure(
+            handshakeFailed ? lastHandshake.Message : ConnectFailureText(peer, lastReason)));
+    }
+
+    /// <summary>
+    /// 探测对端是否可达。只做一次 TCP 连接然后立刻关闭，**不发 hello**，
+    /// 所以不会在对方屏幕上弹出配对提示，适合做「重新连接」和断线自动探测。
+    /// </summary>
+    public async Task<bool> ProbeAsync(LinkPeer peer, CancellationToken cancellationToken = default)
+    {
+        if (!IPAddress.TryParse(peer.Host, out var address) || peer.Port is <= 0 or > 65535)
+        {
+            return false;
         }
 
         var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -534,12 +886,24 @@ public sealed class LinkEngine : IAsyncDisposable
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(LinkProtocol.ConnectTimeout);
             await socket.ConnectAsync(new IPEndPoint(address, peer.Port), timeout.Token).ConfigureAwait(false);
-            return new TcpConnection(socket);
+            return true;
         }
         catch (Exception)
         {
-            socket.Dispose();
-            return null;
+            // 探活失败是常态（对方没开、不在同一网段、超时），界面已经显示结果了，
+            // 不写进日志——否则日志会被每 5 秒一次的探活刷满。
+            return false;
+        }
+        finally
+        {
+            try
+            {
+                socket.Dispose();
+            }
+            catch (Exception)
+            {
+                // 忽略。
+            }
         }
     }
 
@@ -636,7 +1000,7 @@ public sealed class LinkEngine : IAsyncDisposable
                     return;
                 }
 
-                RememberPaired(peerId);
+                RememberPaired(peerId, peerName);
             }
 
             if (!await connection.WriteJsonAsync(LinkMessages.HelloOk(DeviceName, DeviceId), cancellationToken)
@@ -666,7 +1030,7 @@ public sealed class LinkEngine : IAsyncDisposable
                             return;
                         }
 
-                        AppendIncomingText(peerName, text);
+                        AppendIncomingText(peerId, peerName, text);
                         SetStatus(LinkStatusKind.Success, $"收到 {peerName} 发来的文字");
                         if (!await connection.WriteJsonAsync(LinkMessages.Ok(), cancellationToken).ConfigureAwait(false))
                         {
@@ -696,7 +1060,7 @@ public sealed class LinkEngine : IAsyncDisposable
                             return;
                         }
 
-                        AppendIncomingFile(peerName, savedPath, size.Value);
+                        AppendIncomingFile(peerId, peerName, savedPath, size.Value);
                         SetStatus(LinkStatusKind.Success, $"已收到「{Path.GetFileName(savedPath)}」，存在 {ReceiveDir}");
                         if (!await connection.WriteJsonAsync(LinkMessages.Ok(), cancellationToken).ConfigureAwait(false))
                         {
@@ -812,7 +1176,12 @@ public sealed class LinkEngine : IAsyncDisposable
 
     // MARK: - 发送文件数据
 
-    private static async Task<bool> SendFileBytesAsync(
+    /// <summary>
+    /// 传一个文件的数据块。失败时返回「停在哪一步、发了多少字节」，
+    /// 原来的实现只返回 bool，界面上只能给一句含糊的「网络中断」，
+    /// 本地文件读不出来和对端断连根本分不清。
+    /// </summary>
+    private async Task<(bool Ok, long Sent, string Reason, bool Retryable)> SendFileBytesAsync(
         TcpConnection connection,
         string path,
         string name,
@@ -827,27 +1196,27 @@ public sealed class LinkEngine : IAsyncDisposable
         {
             stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, LinkProtocol.FileChunkBytes, useAsync: true);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            return false;
+            return (false, 0, $"打不开本地文件：{ex.Message}", false);
         }
 
+        long sent = 0;
         try
         {
             var buffer = new byte[LinkProtocol.FileChunkBytes];
-            long sent = 0;
             while (sent < size)
             {
                 var want = (int)Math.Min(buffer.Length, size - sent);
                 var read = await stream.ReadAsync(buffer.AsMemory(0, want), cancellationToken).ConfigureAwait(false);
                 if (read <= 0)
                 {
-                    return false;
+                    return (false, sent, $"本地文件只读到 {sent}/{size} 字节就结束了（云盘占位文件或文件被移动、锁定）", false);
                 }
 
                 if (!await connection.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false))
                 {
-                    return false;
+                    return (false, sent, $"传到 {sent}/{size} 字节时连接被对方关闭", true);
                 }
 
                 sent += read;
@@ -855,11 +1224,15 @@ public sealed class LinkEngine : IAsyncDisposable
                 progress?.Report(new SendProgress(Math.Min(0.99, fraction), name));
             }
 
-            return true;
+            return (true, sent, string.Empty, false);
         }
-        catch (Exception)
+        catch (OperationCanceledException)
         {
-            return false;
+            return (false, sent, "已取消", false);
+        }
+        catch (Exception ex)
+        {
+            return (false, sent, $"传了 {sent}/{size} 字节后出错：{ex.Message}", true);
         }
         finally
         {
@@ -878,6 +1251,13 @@ public sealed class LinkEngine : IAsyncDisposable
 
     private void OnPeerSeen(object? sender, LinkPeer peer)
     {
+        // 已经配对过的设备一经发现就进名册：它之后离线了也要留在列表里，
+        // 而不是等下一次收发消息才被记住。
+        if (_paired.Contains(peer.Id))
+        {
+            _devices.Upsert(peer.Id, peer.Name);
+        }
+
         var changed = false;
         var isNew = false;
         IReadOnlyList<LinkPeer>? snapshot = null;
@@ -976,8 +1356,10 @@ public sealed class LinkEngine : IAsyncDisposable
         StatusChanged?.Invoke(this, _status);
     }
 
-    private void RememberPaired(string peerId)
+    private void RememberPaired(string peerId, string peerName)
     {
+        // 配对成功就进名册：以后即使离线，这台设备也要留在列表里。
+        _devices.Upsert(peerId, peerName);
         if (_paired.Add(peerId))
         {
             PairingChanged?.Invoke(this, EventArgs.Empty);
@@ -996,33 +1378,48 @@ public sealed class LinkEngine : IAsyncDisposable
         return SendOutcome.Failure(message);
     }
 
+    /// <summary>用户取消时给出"已取消"，否则才报失败，避免把主动取消说成网络故障。</summary>
+    private SendOutcome FailOrCancel(CancellationToken cancellationToken, string message) =>
+        cancellationToken.IsCancellationRequested ? FinishCancelled() : FinishFailure(message);
+
+    private SendOutcome FinishCancelled(string message = "已取消发送")
+    {
+        SetStatus(LinkStatusKind.Idle, message);
+        return SendOutcome.Cancelled(message);
+    }
+
     private SendOutcome FinishNeedsPairing(string peerName)
     {
         SetStatus(LinkStatusKind.Idle, $"首次给「{peerName}」发送，需要输入对方屏幕上显示的 6 位配对码");
         return SendOutcome.NeedsPairing(peerName);
     }
 
-    private static string ConnectFailureText(LinkPeer peer) =>
-        $"连不上 {peer.Name}，请确认两台设备在同一局域网、对方应用已打开";
-
-    private void AppendIncomingText(string peerName, string text)
+    private static string ConnectFailureText(LinkPeer peer, ConnectFailure reason) => reason switch
     {
-        var message = new ChatMessage
+        ConnectFailure.Refused => $"连不上 {peer.Name}：对方没有在监听，应用可能刚退出或正在重启",
+        ConnectFailure.InvalidTarget => $"连不上 {peer.Name}：地址已失效，等它重新广播后再试",
+        ConnectFailure.Cancelled => "已取消",
+        _ => $"连不上 {peer.Name}：网络暂时不通，请确认两台设备在同一局域网、对方应用已打开",
+    };
+
+    private void AppendIncomingText(string peerId, string peerName, string text)
+    {
+        SaveMessage(new ChatMessage
         {
+            PeerId = peerId,
             Direction = MessageDirection.Incoming,
             PeerName = peerName,
             Date = DateTimeOffset.Now,
             Kind = MessageKind.Text,
             Text = text,
-        };
-        _chat.Append(message);
-        MessageAdded?.Invoke(this, message);
+        });
     }
 
-    private void AppendIncomingFile(string peerName, string savedPath, long size)
+    private void AppendIncomingFile(string peerId, string peerName, string savedPath, long size)
     {
-        var message = new ChatMessage
+        SaveMessage(new ChatMessage
         {
+            PeerId = peerId,
             Direction = MessageDirection.Incoming,
             PeerName = peerName,
             Date = DateTimeOffset.Now,
@@ -1030,29 +1427,27 @@ public sealed class LinkEngine : IAsyncDisposable
             FileName = Path.GetFileName(savedPath),
             FilePath = savedPath,
             FileSize = size,
-        };
-        _chat.Append(message);
-        MessageAdded?.Invoke(this, message);
+        });
     }
 
-    private void AppendOutgoingText(string peerName, string text)
+    private void AppendOutgoingText(string peerId, string peerName, string text)
     {
-        var message = new ChatMessage
+        SaveMessage(new ChatMessage
         {
+            PeerId = peerId,
             Direction = MessageDirection.Outgoing,
             PeerName = peerName,
             Date = DateTimeOffset.Now,
             Kind = MessageKind.Text,
             Text = text,
-        };
-        _chat.Append(message);
-        MessageAdded?.Invoke(this, message);
+        });
     }
 
-    private void AppendOutgoingFile(string peerName, string path)
+    private void AppendOutgoingFile(string peerId, string peerName, string path)
     {
-        var message = new ChatMessage
+        SaveMessage(new ChatMessage
         {
+            PeerId = peerId,
             Direction = MessageDirection.Outgoing,
             PeerName = peerName,
             Date = DateTimeOffset.Now,
@@ -1060,8 +1455,22 @@ public sealed class LinkEngine : IAsyncDisposable
             FileName = Path.GetFileName(path),
             FilePath = path,
             FileSize = GetFileSize(path),
-        };
-        _chat.Append(message);
+        });
+    }
+
+    /// <summary>落到这台设备自己的会话文件里，并把设备记进名册。</summary>
+    private void SaveMessage(ChatMessage message)
+    {
+        _chats.Append(message);
+        try
+        {
+            _devices.Upsert(message.PeerId, message.PeerName);
+        }
+        catch (Exception ex)
+        {
+            Log($"device roster update failed: {ex.Message}");
+        }
+
         MessageAdded?.Invoke(this, message);
     }
 

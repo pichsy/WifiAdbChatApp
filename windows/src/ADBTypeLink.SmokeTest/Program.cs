@@ -136,22 +136,28 @@ internal static class Program
             return;
         }
 
+        // 每台设备一份独立会话：A 看的是「B 这台设备」的记录，B 看的是「A」的。
+        IReadOnlyList<ChatMessage> SeenByA() => peerA.GetConversation(peerB.DeviceId, peerB.DeviceName);
+        IReadOnlyList<ChatMessage> SeenByB() => peerB.GetConversation(peerA.DeviceId, peerA.DeviceName);
+
         // 2. 未配对发送 -> pair_required
         var firstText = "你好，世界 👋 第一行\n第二行 with emoji 🚀";
         var needsPairing = await peerA.SendTextAsync(bSeenByA, firstText);
         Check(needsPairing.Status == SendStatus.NeedsPairing, $"未配对发送返回 NeedsPairing (message={needsPairing.Message ?? "-"})");
         Check(await WaitUntilAsync(() => pairRequestedByB, TimeSpan.FromSeconds(6)), "B 触发「正在请求配对」事件");
-        Check(!peerB.Messages.Any(item => item.Text == firstText), "未配对时对端不应收到文字");
+        Check(!SeenByB().Any(item => item.Text == firstText), "未配对时对端不应收到文字");
+        Check(SeenByB().Count == 0 && SeenByA().Count == 0, "没有来往时两边会话都是空的");
+        Check(peerB.GetConversation("不存在的设备", "路人甲").Count == 0, "别的设备看不到这台设备的会话（隔离）");
 
         // 3. 带配对码发送 -> hello_ok
         var pairedText = "带配对码发送成功 ✅";
         var pairedResult = await peerA.SendTextAsync(bSeenByA, pairedText, peerB.PairingCode);
         Check(pairedResult.Status == SendStatus.Ok, $"带配对码发送文字成功 (message={pairedResult.Message ?? "-"})");
         Check(await WaitUntilAsync(
-                () => peerB.Messages.Any(item => item.Direction == MessageDirection.Incoming && item.Text == pairedText),
+                () => SeenByB().Any(item => item.Direction == MessageDirection.Incoming && item.Text == pairedText),
                 TimeSpan.FromSeconds(6)),
             "B 聊天记录出现收到的文字");
-        Check(peerA.Messages.Any(item => item.Direction == MessageDirection.Outgoing && item.Text == pairedText), "A 聊天记录出现发出的文字");
+        Check(SeenByA().Any(item => item.Direction == MessageDirection.Outgoing && item.Text == pairedText), "A 聊天记录出现发出的文字");
         Check(peerA.IsPaired(peerB.DeviceId) && peerB.IsPaired(peerA.DeviceId), "双方都已记录配对关系");
 
         // 4. 已配对后不再需要配对码
@@ -159,7 +165,7 @@ internal static class Program
         var secondResult = await peerA.SendTextAsync(bSeenByA, secondText);
         Check(secondResult.Status == SendStatus.Ok, $"已配对后无需配对码即可发送 (message={secondResult.Message ?? "-"})");
         Check(await WaitUntilAsync(
-                () => peerB.Messages.Any(item => item.Text == secondText),
+                () => SeenByB().Any(item => item.Text == secondText),
                 TimeSpan.FromSeconds(6)),
             "B 收到第二条文字");
 
@@ -168,7 +174,7 @@ internal static class Program
         var longResult = await peerA.SendTextAsync(bSeenByA, longText);
         var longTextOk = longResult.Status == SendStatus.Ok
             && await WaitUntilAsync(
-                () => peerB.Messages.Any(item => item.Text != null && item.Text.Length == longText.Length && item.Text == longText),
+                () => SeenByB().Any(item => item.Text != null && item.Text.Length == longText.Length && item.Text == longText),
                 TimeSpan.FromSeconds(15));
         Check(longTextOk, $"200000 字长文本完整送达 (UTF-8 {Encoding.UTF8.GetByteCount(longText)} 字节)");
 
@@ -185,7 +191,7 @@ internal static class Program
         Check(await WaitUntilAsync(() => File.Exists(receivedPath), TimeSpan.FromSeconds(6)), $"接收目录出现文件: {receivedPath}");
         Check(File.Exists(receivedPath) && Sha256File(receivedPath) == Sha256Bytes(fileBytes), "接收文件内容与发送一致");
         Check(await WaitUntilAsync(
-                () => peerB.Messages.Any(item => item.Kind == MessageKind.File && item.FileName == "报告 1.txt"),
+                () => SeenByB().Any(item => item.Kind == MessageKind.File && item.FileName == "报告 1.txt"),
                 TimeSpan.FromSeconds(6)),
             "B 聊天记录出现文件消息");
 
@@ -233,19 +239,93 @@ internal static class Program
         Check(stopwatch.Elapsed < TimeSpan.FromSeconds(8), $"失败提示在 8 秒内返回（实际 {stopwatch.ElapsedMilliseconds} ms）");
         Check(peerA.Peers.All(item => item.Id != "dead-device"), "连接失败后引擎仍在运行");
 
-        // 12. 持久化
+        // 12. 探活（界面上的「重新连接」/ 自动重连都走这条路径）
+        Check(await peerA.ProbeAsync(bSeenByA), "ProbeAsync 对在线设备返回 true");
+        Check(!await peerA.ProbeAsync(deadPeer), "ProbeAsync 对已退出设备返回 false");
+
+        // 13. 取消发送：拿到第一次进度就取消，应尽快返回 Cancelled
+        var bigPath = Path.Combine(filesDir, "大文件.bin");
+        File.WriteAllBytes(bigPath, RandomNumberGenerator.GetBytes(8_000_000));
+        using var midCts = new CancellationTokenSource();
+        var cancelProgress = new CancelOnFirstReport(midCts);
+        var cancelWatch = Stopwatch.StartNew();
+        var cancelled = await peerA.SendFilesAsync(bSeenByA, new[] { bigPath }, null, cancelProgress, midCts.Token);
+        cancelWatch.Stop();
+        Check(cancelled.Status == SendStatus.Cancelled,
+            $"中途取消返回 Cancelled (status={cancelled.Status}, message={cancelled.Message ?? "-"})");
+        Check(cancelWatch.Elapsed < TimeSpan.FromSeconds(5),
+            $"取消后 5 秒内返回（实际 {cancelWatch.ElapsedMilliseconds} ms）");
+        Check(cancelProgress.Reports >= 3, $"取消前已经传了一部分数据（{cancelProgress.Reports} 次进度）");
+        Check(!File.Exists(Path.Combine(peerB.ReceiveDir, "大文件.bin")), "取消后接收端不会留下半截文件");
+        Check(peerB.IsRunning, "取消后接收端仍在运行");
+
+        // 14. 取消一次之后链路还能正常用
+        var afterCancel = await peerA.SendTextAsync(bSeenByA, "取消之后还能继续发");
+        Check(afterCancel.Status == SendStatus.Ok, $"取消后仍可正常发送 (message={afterCancel.Message ?? "-"})");
+
+        // 15. 文件传输出错后按文件重传（对端收完文件头就断开）
+        using (var dropPeer = new DropOnFilePeer())
+        {
+            var dropFile = Path.Combine(filesDir, "断连重传.bin");
+            File.WriteAllBytes(dropFile, RandomNumberGenerator.GetBytes(4_000_000));
+            var dropLink = new LinkPeer
+            {
+                Id = dropPeer.Id,
+                Name = "DropPeer",
+                Host = "127.0.0.1",
+                Port = dropPeer.Port,
+                LastSeenUtc = DateTime.UtcNow,
+            };
+
+            var dropResult = await peerA.SendFilesAsync(dropLink, new[] { dropFile });
+            Check(dropResult.Status == SendStatus.Failure && (dropResult.Message ?? string.Empty).Contains("没发完"),
+                $"对端反复断连时给出明确失败原因 (message={dropResult.Message ?? "-"})");
+            Check(dropPeer.Accepted == 3,
+                $"按文件重传了 {3} 次（实际建立 {dropPeer.Accepted} 条连接）");
+            Check((dropResult.Message ?? string.Empty).Contains("字节"),
+                "失败原因写明传到多少字节时断的");
+        }
+
+        // 16. 旧版单文件 chat.json 迁移（升级路径）
+        var legacyDir = Path.Combine(root, "legacy");
+        Directory.CreateDirectory(legacyDir);
+        File.WriteAllText(
+            Path.Combine(legacyDir, "chat.json"),
+            "[{\"id\":\"old-1\",\"direction\":\"incoming\",\"peerName\":\"老设备\",\"date\":\"2026-11-01T10:00:00+08:00\",\"kind\":\"text\",\"text\":\"迁移前的旧消息\"}]",
+            new UTF8Encoding(false));
+
+        await using (var legacyEngine = new LinkEngine(new LinkEngineOptions
+                     {
+                         DataDirectory = legacyDir,
+                         ReceiveDirectory = Path.Combine(legacyDir, "recv"),
+                         DeviceName = "迁移测试机",
+                     }))
+        {
+            var migrated = legacyEngine.GetConversation("还没见过的设备ID", "老设备");
+            Check(migrated.Count == 1 && migrated[0].Text == "迁移前的旧消息", "旧 chat.json 的消息按设备归档后不丢");
+            Check(legacyEngine.GetConversation("还没见过的设备ID", "老设备").Count == 1, "同一台设备不会把历史重复算两遍");
+            Check(legacyEngine.KnownDevices.Any(device => device.Name == "老设备"), "没有设备 ID 的旧会话也作为离线设备出现");
+            Check(!File.Exists(Path.Combine(legacyDir, "chat.json")), "迁移后旧 chat.json 改名留底");
+            Check(Directory.EnumerateFiles(Path.Combine(legacyDir, "chats"), "*.json").Any(), "chats/ 下生成了按设备的会话文件");
+        }
+
+        // 17. 持久化
         var pairedJson = Path.Combine(peerB.DataDirectory, "paired.json");
         Check(File.Exists(pairedJson) && File.ReadAllText(pairedJson).Contains(peerA.DeviceId), "paired.json 已持久化对方设备 ID");
-        var chatJson = Path.Combine(peerB.DataDirectory, "chat.json");
-        Check(File.Exists(chatJson) && File.ReadAllText(chatJson).Contains("报告 1.txt"), "chat.json 已持久化文件消息");
+        var conversationFile = Path.Combine(peerB.DataDirectory, "chats", peerA.DeviceId + ".json");
+        Check(File.Exists(conversationFile) && File.ReadAllText(conversationFile).Contains("报告 1.txt"),
+            "每台设备一个会话文件：chats/<设备ID>.json");
+        Check(!File.Exists(Path.Combine(peerB.DataDirectory, "chat.json")), "不再写全局 chat.json");
+        var rosterJson = Path.Combine(peerB.DataDirectory, "devices.json");
+        Check(File.Exists(rosterJson) && File.ReadAllText(rosterJson).Contains(peerA.DeviceId), "devices.json 记住了这台设备");
         var deviceJson = Path.Combine(peerB.DataDirectory, "device.json");
         Check(File.Exists(deviceJson) && File.ReadAllText(deviceJson).Contains(peerB.DeviceId), "device.json 已持久化设备 ID");
 
-        // 13. 重启后恢复
+        // 18. 重启后恢复
         var bDataDir = peerB.DataDirectory;
         var bReceiveDir = peerB.ReceiveDir;
         var bDeviceId = peerB.DeviceId;
-        var bMessageCount = peerB.Messages.Count;
+        var bMessageCount = SeenByB().Count;
         await peerB.StopAsync();
 
         await using (var reborn = new LinkEngine(new LinkEngineOptions
@@ -257,11 +337,165 @@ internal static class Program
         {
             Check(reborn.DeviceId == bDeviceId, "重启后设备 ID 不变");
             Check(reborn.IsPaired(peerA.DeviceId), "重启后配对关系恢复");
-            Check(reborn.Messages.Count == bMessageCount && bMessageCount > 5, $"重启后聊天记录恢复（{reborn.Messages.Count} 条）");
+            var rebornConversation = reborn.GetConversation(peerA.DeviceId, peerA.DeviceName);
+            Check(rebornConversation.Count == bMessageCount && bMessageCount > 5, $"重启后会话记录恢复（{rebornConversation.Count} 条）");
+            Check(reborn.KnownDevices.Any(device => device.Id == peerA.DeviceId), "重启后名册里仍有这台设备（离线也保留）");
             Check(reborn.ReceiveDir == bReceiveDir, "重启后接收目录恢复");
         }
 
         Check(peerA.IsRunning, "A 引擎仍在运行");
+    }
+
+    /// <summary>传到第 N 帧进度时取消，用来确定性地测试「传输中途取消」。</summary>
+    private sealed class CancelOnFirstReport : IProgress<SendProgress>
+    {
+        private readonly CancellationTokenSource _cts;
+        private readonly int _cancelAt;
+
+        public CancelOnFirstReport(CancellationTokenSource cts, int cancelAt = 3)
+        {
+            _cts = cts;
+            _cancelAt = cancelAt;
+        }
+
+        public int Reports;
+
+        public void Report(SendProgress value)
+        {
+            var count = Interlocked.Increment(ref Reports);
+            if (count < _cancelAt)
+            {
+                return;
+            }
+
+            try
+            {
+                _cts.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // 已经结束了。
+            }
+        }
+    }
+
+    /// <summary>
+    /// 假对端：握手成功，但收到文件头就断开，用来确定性地触发「按文件重传」。
+    /// </summary>
+    private sealed class DropOnFilePeer : IDisposable
+    {
+        private readonly TcpListener _listener;
+        private readonly CancellationTokenSource _cts = new();
+        private int _accepted;
+
+        public DropOnFilePeer()
+        {
+            Id = "drop-peer-" + Guid.NewGuid().ToString("N").Substring(0, 8);
+            _listener = new TcpListener(IPAddress.Loopback, 0);
+            _listener.Start();
+            Port = ((IPEndPoint)_listener.LocalEndpoint).Port;
+            _ = Task.Run(AcceptLoopAsync);
+        }
+
+        public int Port { get; }
+
+        public string Id { get; }
+
+        public int Accepted => Volatile.Read(ref _accepted);
+
+        private async Task AcceptLoopAsync()
+        {
+            while (!_cts.IsCancellationRequested)
+            {
+                TcpClient client;
+                try
+                {
+                    client = await _listener.AcceptTcpClientAsync(_cts.Token);
+                }
+                catch (Exception)
+                {
+                    return;
+                }
+
+                Interlocked.Increment(ref _accepted);
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        using var connection = client;
+                        var stream = connection.GetStream();
+                        await ReadFrameAsync(stream, _cts.Token);
+                        await WriteJsonAsync(
+                            stream,
+                            $"{{\"type\":\"hello_ok\",\"name\":\"DropPeer\",\"id\":\"{Id}\"}}",
+                            _cts.Token);
+                        await ReadFrameAsync(stream, _cts.Token);
+                        connection.Close();
+                    }
+                    catch (Exception)
+                    {
+                        // 对端主动断开是预期行为。
+                    }
+                }, _cts.Token);
+            }
+        }
+
+        private static async Task ReadFrameAsync(NetworkStream stream, CancellationToken cancellationToken)
+        {
+            var header = new byte[4];
+            await ReadExactAsync(stream, header, cancellationToken);
+            var length = (header[0] << 24) | (header[1] << 16) | (header[2] << 8) | header[3];
+            if (length <= 0 || length > 32 * 1024 * 1024)
+            {
+                throw new InvalidDataException($"bad frame length {length}");
+            }
+
+            var body = new byte[length];
+            await ReadExactAsync(stream, body, cancellationToken);
+        }
+
+        private static async Task ReadExactAsync(NetworkStream stream, Memory<byte> buffer, CancellationToken cancellationToken)
+        {
+            var offset = 0;
+            while (offset < buffer.Length)
+            {
+                var read = await stream.ReadAsync(buffer[offset..], cancellationToken);
+                if (read <= 0)
+                {
+                    throw new EndOfStreamException();
+                }
+
+                offset += read;
+            }
+        }
+
+        private static async Task WriteJsonAsync(NetworkStream stream, string json, CancellationToken cancellationToken)
+        {
+            var payload = Encoding.UTF8.GetBytes(json);
+            var header = new byte[4];
+            header[0] = (byte)(payload.Length >> 24);
+            header[1] = (byte)(payload.Length >> 16);
+            header[2] = (byte)(payload.Length >> 8);
+            header[3] = (byte)payload.Length;
+            await stream.WriteAsync(header, cancellationToken);
+            await stream.WriteAsync(payload, cancellationToken);
+            await stream.FlushAsync(cancellationToken);
+        }
+
+        public void Dispose()
+        {
+            _cts.Cancel();
+            try
+            {
+                _listener.Stop();
+            }
+            catch (Exception)
+            {
+                // 忽略。
+            }
+
+            _cts.Dispose();
+        }
     }
 
     // MARK: - 跨进程（父进程做客户端，子进程做服务端）

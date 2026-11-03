@@ -28,8 +28,14 @@ public sealed class LinkPaths
     /// <summary>已配对设备 ID 列表（§8：paired.json，JSON 字符串数组）。</summary>
     public string PairedFile => Path.Combine(DataDirectory, "paired.json");
 
-    /// <summary>聊天记录（§8：chat.json）。</summary>
+    /// <summary>旧版单文件聊天记录（§8：chat.json），仅用于迁移。</summary>
     public string ChatFile => Path.Combine(DataDirectory, "chat.json");
+
+    /// <summary>按设备分开的聊天记录目录：chats/&lt;peerId&gt;.json。</summary>
+    public string ChatsDirectory => Path.Combine(DataDirectory, "chats");
+
+    /// <summary>记住过的设备（配对过 / 有过往来），用于离线也留在列表里。</summary>
+    public string KnownDevicesFile => Path.Combine(DataDirectory, "devices.json");
 
     /// <summary>本机设置（接收目录等）。</summary>
     public string SettingsFile => Path.Combine(DataDirectory, "settings.json");

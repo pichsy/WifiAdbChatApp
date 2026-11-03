@@ -31,14 +31,23 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private string _draftText = string.Empty;
     private bool _isDragOver;
     private bool _initialized;
+    private DispatcherTimer? _presenceTimer;
+    private CancellationTokenSource? _sendCts;
+    private string? _sendError;
+    private bool _probeInFlight;
+    private DateTime _lastProbeUtc = DateTime.MinValue;
 
     public MainViewModel(LinkEngine? engine = null)
     {
         _dispatcher = Dispatcher.UIThread;
         _engine = engine ?? new LinkEngine();
+        _engine.LogSink = AppLog.Write;
     }
 
     public LinkEngine Engine => _engine;
+
+    /// <summary>「移动设备」页（adb 文字注入 / 文件推送）。</summary>
+    public MobileDeviceViewModel Mobile { get; } = new();
 
     public ObservableCollection<PeerItemViewModel> Peers => _peers;
 
@@ -61,7 +70,13 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         _engine.StatusChanged += (_, status) => OnUi(() => ApplyStatus(status));
         _engine.PeersChanged += (_, peers) => OnUi(() => ApplyPeers(peers));
         _engine.MessageAdded += (_, message) => OnUi(() => AddMessage(message));
-        _engine.MessagesCleared += (_, _) => OnUi(ClearMessageCollection);
+        _engine.ConversationCleared += (_, peerId) => OnUi(() =>
+        {
+            if (_selectedPeer is not null && string.Equals(_selectedPeer.Id, peerId, StringComparison.Ordinal))
+            {
+                ClearMessageCollection();
+            }
+        });
         _engine.PairingChanged += (_, _) => OnUi(RefreshPairing);
         _engine.PairRequested += (_, eventArgs) => OnUi(() => ApplyPairRequest(eventArgs));
 
@@ -70,21 +85,140 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         ReceiveDir = _engine.ReceiveDir;
         PairedCount = _engine.PairedCount;
         ApplyStatus(_engine.Status);
+        // 名册里的设备在 ApplyPeers 里恢复成「离线」行，并自动选中第一台，
+        // 会话由此加载，不需要再把全部消息塞进一个列表。
         ApplyPeers(_engine.Peers);
-
-        foreach (var message in _engine.Messages)
-        {
-            _messages.Add(new MessageItemViewModel(message));
-        }
 
         OnPropertyChanged(nameof(MessagesEmpty));
 
         await _engine.StartAsync();
+        await Mobile.InitializeAsync();
+
+        // 每 2 秒刷新一次在线状态：引擎只负责「18 秒没广播就移除」，
+        // 而「超过 6 秒没广播」这个更早的掉线信号要靠界面自己显示出来，
+        // 这样用户能看到「连接中断，正在重连…」，而不是设备凭空消失。
+        _presenceTimer = new DispatcherTimer(
+            TimeSpan.FromSeconds(2),
+            DispatcherPriority.Background,
+            (_, _) => RefreshPresence());
+        _presenceTimer.Start();
     }
 
     public async ValueTask DisposeAsync()
     {
+        _presenceTimer?.Stop();
+        _presenceTimer = null;
+        Mobile.Dispose();
         await _engine.DisposeAsync();
+    }
+
+    private void RefreshPresence()
+    {
+        var utcNow = DateTime.UtcNow;
+        foreach (var peer in _peers)
+        {
+            peer.RefreshPresence(utcNow);
+        }
+
+        RaiseHeaderProperties();
+        MaybeAutoProbe(utcNow);
+    }
+
+    /// <summary>
+    /// 自动重连：UDP 广播丢了不代表链路断了，所以对「看起来掉线」的选中设备
+    /// 每 5 秒做一次轻量 TCP 探测，通了就把状态改回在线。
+    /// </summary>
+    private void MaybeAutoProbe(DateTime utcNow)
+    {
+        var peer = SelectedPeer;
+        // Port 为 0 说明它从来没在局域网里出现过（比如只有历史记录的旧设备），探了也没意义。
+        if (peer is null || Busy || _probeInFlight || peer.IsOnline || peer.Port <= 0)
+        {
+            return;
+        }
+
+        if (utcNow - _lastProbeUtc < TimeSpan.FromSeconds(5))
+        {
+            return;
+        }
+
+        _lastProbeUtc = utcNow;
+        _ = ProbePeerAsync(peer, announce: false);
+    }
+
+    /// <summary>手动「重新连接」：不管当前状态，立即探一次并给出明确结果。</summary>
+    public async Task<bool> ReconnectSelectedAsync()
+    {
+        var peer = SelectedPeer;
+        if (peer is null)
+        {
+            SetLocalFailure("先在左侧选择设备");
+            return false;
+        }
+
+        if (_probeInFlight)
+        {
+            return false;
+        }
+
+        if (peer.Port <= 0)
+        {
+            SetLocalFailure($"「{peer.Name}」暂时没有出现在局域网里，等它上线后会自动连上");
+            return false;
+        }
+
+        SetLocalFailure("正在重新连接…");
+        return await ProbePeerAsync(peer, announce: true);
+    }
+
+    private async Task<bool> ProbePeerAsync(PeerItemViewModel peer, bool announce)
+    {
+        if (_probeInFlight)
+        {
+            return false;
+        }
+
+        _probeInFlight = true;
+        peer.IsProbing = true;
+        try
+        {
+            var reachable = await _engine.ProbeAsync(peer.ToPeer()).ConfigureAwait(true);
+            if (reachable)
+            {
+                peer.MarkReachable(DateTime.UtcNow);
+            }
+
+            if (announce)
+            {
+                if (reachable)
+                {
+                    ApplyStatus(new LinkStatus(LinkStatusKind.Success, $"已重新连上 {peer.Name}"));
+                }
+                else
+                {
+                    ApplyStatus(new LinkStatus(
+                        LinkStatusKind.Failure,
+                        $"连不上 {peer.Name}：对方可能已经退出，或两台机器不在同一个网络"));
+                }
+            }
+
+            RaiseHeaderProperties();
+            return reachable;
+        }
+        catch (Exception exception)
+        {
+            if (announce)
+            {
+                ApplyStatus(new LinkStatus(LinkStatusKind.Failure, $"重新连接失败：{exception.Message}"));
+            }
+
+            return false;
+        }
+        finally
+        {
+            peer.IsProbing = false;
+            _probeInFlight = false;
+        }
     }
 
     private void OnUi(Action action)
@@ -174,7 +308,14 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     public bool NoPeers => _peers.Count == 0;
 
-    public string PeerCountText => $"{_peers.Count} 台";
+    public string PeerCountText
+    {
+        get
+        {
+            var offline = _peers.Count(peer => !peer.IsOnline);
+            return offline == 0 ? $"{_peers.Count} 台" : $"{_peers.Count - offline} 在线 · {offline} 离线";
+        }
+    }
 
     public PeerItemViewModel? SelectedPeer
     {
@@ -201,6 +342,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             OnPropertyChanged();
             RaiseComposeProperties();
             RaiseHeaderProperties();
+            LoadConversation();
         }
     }
 
@@ -218,7 +360,10 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
                 return "先在左侧选择设备";
             }
 
-            return peer.IsPaired ? "已配对 · 在线" : "未配对 · 在线";
+            var presence = peer.IsOnline
+                ? "在线"
+                : (peer.IsKnown || peer.HasHistory ? "离线，历史记录可查看" : "连接中断");
+            return peer.IsPaired ? $"已配对 · {presence}" : $"未配对 · {presence}";
         }
     }
 
@@ -294,8 +439,17 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public double SendProgress
     {
         get => _sendProgress;
-        private set => SetProperty(ref _sendProgress, Math.Clamp(value, 0, 1));
+        private set
+        {
+            if (SetProperty(ref _sendProgress, Math.Clamp(value, 0, 1)))
+            {
+                OnPropertyChanged(nameof(SendPercentText));
+            }
+        }
     }
+
+    /// <summary>进度百分比，界面上直接显示成 46%。</summary>
+    public string SendPercentText => $"{Math.Round(_sendProgress * 100):0}%";
 
     public string SendLabel
     {
@@ -309,7 +463,24 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
-    public string SendLabelText => $"正在发送 {SendLabel}…";
+    public string SendLabelText => string.IsNullOrEmpty(SendLabel) ? "正在发送…" : $"正在发送 {SendLabel}";
+
+    /// <summary>发送失败时的醒目提示：原来失败只写进角落的状态行，用户以为「点了没反应」。</summary>
+    public string? SendErrorText
+    {
+        get => _sendError;
+        private set
+        {
+            if (SetProperty(ref _sendError, value))
+            {
+                OnPropertyChanged(nameof(HasSendError));
+            }
+        }
+    }
+
+    public bool HasSendError => !string.IsNullOrEmpty(_sendError);
+
+    public void DismissSendError() => SendErrorText = null;
 
     public string DraftText
     {
@@ -373,9 +544,17 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         RaiseHeaderProperties();
     }
 
+    /// <summary>只清当前这台设备的记录，别的设备一个字都不动。</summary>
     public void ClearMessages()
     {
-        _engine.ClearMessages();
+        var peer = SelectedPeer;
+        if (peer is null)
+        {
+            return;
+        }
+
+        _engine.ClearConversation(peer.Id, peer.Name);
+        peer.HasHistory = false;
     }
 
     public void SetReceiveDir(string path)
@@ -474,7 +653,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         }
 
         var target = peer.ToPeer();
-        return await RunSendAsync(progress => _engine.SendTextAsync(target, text, pairingCode, progress));
+        AppLog.Write($"send text -> {peer.Name} ({text.Length} chars, pairing={pairingCode is not null})");
+        return await RunSendAsync((progress, token) => _engine.SendTextAsync(target, text, pairingCode, progress, token));
     }
 
     public async Task<SendOutcome> SendFilesAsync(IReadOnlyList<string> paths, string? pairingCode)
@@ -491,7 +671,9 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         }
 
         var target = peer.ToPeer();
-        return await RunSendAsync(progress => _engine.SendFilesAsync(target, paths, pairingCode, progress));
+        AppLog.Write($"send files -> {peer.Name} ({paths.Count} file(s), pairing={pairingCode is not null}): "
+            + string.Join(", ", paths.Select(path => $"{Path.GetFileName(path)}={SafeLength(path)}")));
+        return await RunSendAsync((progress, token) => _engine.SendFilesAsync(target, paths, pairingCode, progress, token));
     }
 
     public async Task<SendOutcome> PairSelectedPeerAsync(string pairingCode)
@@ -508,19 +690,36 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public async Task<SendOutcome> PairPeerAsync(PeerItemViewModel peer, string pairingCode)
     {
         var target = peer.ToPeer();
-        return await RunSendAsync(progress => _engine.PairAsync(target, pairingCode, progress));
+        return await RunSendAsync((progress, token) => _engine.PairAsync(target, pairingCode, progress, token));
     }
 
     public void ClearDraft() => DraftText = string.Empty;
 
-    private async Task<SendOutcome> RunSendAsync(Func<IProgress<SendProgress>, Task<SendOutcome>> action)
+    /// <summary>用户点进度条右边的 ✕：中断本次发送。</summary>
+    public void CancelSend()
+    {
+        try
+        {
+            _sendCts?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // 已经结束了。
+        }
+    }
+
+    private async Task<SendOutcome> RunSendAsync(
+        Func<IProgress<SendProgress>, CancellationToken, Task<SendOutcome>> action)
     {
         if (Busy)
         {
             return SendOutcome.Failure("正在发送，请稍候");
         }
 
+        using var cts = new CancellationTokenSource();
+        _sendCts = cts;
         Busy = true;
+        SendErrorText = null;
         SendProgress = 0;
         SendLabel = string.Empty;
 
@@ -538,15 +737,31 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
         try
         {
-            return await action(progress);
+            var outcome = await action(progress, cts.Token);
+            AppLog.Write($"send result: {outcome.Status} {outcome.Message}");
+            if (!outcome.IsOk && !outcome.IsCancelled && !string.IsNullOrEmpty(outcome.Message))
+            {
+                SendErrorText = outcome.Message;
+            }
+
+            return outcome;
+        }
+        catch (OperationCanceledException)
+        {
+            var cancelled = SendOutcome.Cancelled();
+            ApplyStatus(new LinkStatus(LinkStatusKind.Idle, "已取消发送"));
+            return cancelled;
         }
         catch (Exception exception)
         {
-            SetLocalFailure($"发送失败：{exception.Message}");
-            return SendOutcome.Failure($"发送失败：{exception.Message}");
+            var message = $"发送失败：{exception.Message}";
+            SetLocalFailure(message);
+            SendErrorText = message;
+            return SendOutcome.Failure(message);
         }
         finally
         {
+            _sendCts = null;
             Busy = false;
             SendProgress = 0;
             SendLabel = string.Empty;
@@ -569,14 +784,66 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             incoming[peer.Id] = peer;
         }
 
-        // 移除已下线的设备
+        // 名册：配对过的、有过来往的。它们即使此刻没广播到，也要留在列表里，
+        // 只是状态显示为离线——历史记录仍然能打开。
+        var known = new Dictionary<string, KnownDevice>(StringComparer.Ordinal);
+        foreach (var device in _engine.KnownDevices)
+        {
+            known[device.Id] = device;
+        }
+
+        // 先把所有行标记为离线，再由下面的发现结果点亮。
+        foreach (var item in _peers)
+        {
+            item.MarkOffline();
+        }
+
+        // 更新 / 新增在线设备
+        foreach (var peer in snapshot)
+        {
+            var index = IndexOfPeer(peer.Id);
+            if (index >= 0)
+            {
+                _peers[index].Update(peer);
+                _peers[index].IsPaired = _engine.IsPaired(peer.Id);
+                _peers[index].HasHistory = _engine.HasConversation(peer.Id, peer.Name);
+            }
+            else
+            {
+                _peers.Add(new PeerItemViewModel(peer)
+                {
+                    IsPaired = _engine.IsPaired(peer.Id),
+                    HasHistory = _engine.HasConversation(peer.Id, peer.Name),
+                });
+            }
+        }
+
+        // 名册里但没广播到的：补成离线设备
+        foreach (var device in known.Values)
+        {
+            var index = IndexOfPeer(device.Id);
+            if (index >= 0)
+            {
+                _peers[index].IsPaired = _engine.IsPaired(device.Id);
+                _peers[index].HasHistory = _engine.HasConversation(device.Id, device.Name);
+                continue;
+            }
+
+            var item = PeerItemViewModel.FromKnown(device);
+            item.IsPaired = _engine.IsPaired(device.Id);
+            item.HasHistory = _engine.HasConversation(device.Id, device.Name);
+            _peers.Add(item);
+        }
+
+        // 只有「既不在广播里、也不在名册里」的才移除
         for (var index = _peers.Count - 1; index >= 0; index--)
         {
-            if (!incoming.ContainsKey(_peers[index].Id))
+            var item = _peers[index];
+            if (!incoming.ContainsKey(item.Id) && !known.ContainsKey(item.Id))
             {
-                if (ReferenceEquals(_selectedPeer, _peers[index]))
+                if (ReferenceEquals(_selectedPeer, item))
                 {
-                    _selectedPeer.IsSelected = false;
+                    item.IsSelected = false;
                     _selectedPeer = null;
                     OnPropertyChanged(nameof(SelectedPeer));
                 }
@@ -585,39 +852,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             }
         }
 
-        // 更新已有设备
-        foreach (var item in _peers)
-        {
-            if (incoming.TryGetValue(item.Id, out var peer))
-            {
-                item.Update(peer);
-                item.IsPaired = _engine.IsPaired(item.Id);
-            }
-        }
-
-        // 新增设备
-        var existingIds = new HashSet<string>(_peers.Select(item => item.Id), StringComparer.Ordinal);
-        foreach (var peer in snapshot)
-        {
-            if (existingIds.Add(peer.Id))
-            {
-                _peers.Add(new PeerItemViewModel(peer) { IsPaired = _engine.IsPaired(peer.Id) });
-            }
-        }
-
-        // 按引擎给的顺序重排（引擎按名称排序）
-        for (var target = 0; target < snapshot.Count; target++)
-        {
-            var current = IndexOfPeer(snapshot[target].Id);
-            if (current >= 0 && current != target)
-            {
-                _peers.Move(current, target);
-            }
-        }
+        SortPeers();
 
         if (_selectedPeer is null && _peers.Count > 0)
         {
-            SelectedPeer = _peers[0];
+            // 优先选在线的；全离线时选最近有来往的那台，历史记录能直接看到。
+            SelectedPeer = _peers.FirstOrDefault(item => item.IsOnline) ?? _peers[0];
         }
         else if (_selectedPeer is not null)
         {
@@ -628,6 +868,46 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         OnPropertyChanged(nameof(NoPeers));
         OnPropertyChanged(nameof(PeerCountText));
         RaiseHeaderProperties();
+    }
+
+    /// <summary>在线的排前面，其次按最近有来往的时间。</summary>
+    private void SortPeers()
+    {
+        var ordered = _peers
+            .OrderByDescending(item => item.IsOnline)
+            .ThenByDescending(item => item.LastSeenUtc)
+            .ThenBy(item => item.Name, StringComparer.CurrentCulture)
+            .ToArray();
+
+        for (var target = 0; target < ordered.Length; target++)
+        {
+            var current = _peers.IndexOf(ordered[target]);
+            if (current >= 0 && current != target)
+            {
+                _peers.Move(current, target);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 切换设备 = 换一份会话缓存。每台设备各自一份，互不串台；
+    /// 离线设备照样能翻历史记录。
+    /// </summary>
+    private void LoadConversation()
+    {
+        _messages.Clear();
+
+        var peer = _selectedPeer;
+        if (peer is not null)
+        {
+            foreach (var message in _engine.GetConversation(peer.Id, peer.Name))
+            {
+                _messages.Add(new MessageItemViewModel(message));
+            }
+        }
+
+        OnPropertyChanged(nameof(MessagesEmpty));
+        OnPropertyChanged(nameof(MessageCountText));
     }
 
     private int IndexOfPeer(string id)
@@ -645,6 +925,20 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
     private void AddMessage(ChatMessage message)
     {
+        var peer = _selectedPeer;
+
+        // 消息已经落到它自己那台设备的缓存里了；这里只负责刷新当前正在看的会话，
+        // 别的设备发来的消息不该出现在这个窗口里。
+        var belongs = peer is not null
+            && (!string.IsNullOrEmpty(message.PeerId)
+                ? string.Equals(message.PeerId, peer.Id, StringComparison.Ordinal)
+                : string.Equals(message.PeerName, peer.Name, StringComparison.Ordinal));
+        if (!belongs)
+        {
+            return;
+        }
+
+        peer!.HasHistory = true;
         _messages.Add(new MessageItemViewModel(message));
         OnPropertyChanged(nameof(MessagesEmpty));
         OnPropertyChanged(nameof(MessageCountText));
@@ -680,6 +974,19 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         PendingPairName = eventArgs.PeerName;
     }
 
+    /// <summary>日志用：文件大小，读不到就打个问号，绝不能因为日志把发送搞挂。</summary>
+    private static string SafeLength(string path)
+    {
+        try
+        {
+            return new FileInfo(path).Length.ToString();
+        }
+        catch (Exception)
+        {
+            return "?";
+        }
+    }
+
     private void RaiseHeaderProperties()
     {
         OnPropertyChanged(nameof(HeaderTitle));
@@ -711,6 +1018,9 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 
         var viewModel = new MainViewModel(demoEngine);
         viewModel.LoadDemoData(heavy);
+
+        // 截图 / 演示模式也让「移动设备」页拿到真实设备列表，界面上不会空着。
+        _ = viewModel.Mobile.InitializeAsync();
         return viewModel;
     }
 
@@ -742,8 +1052,19 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             LastSeenUtc = DateTime.UtcNow,
         });
 
+        // 演示：一台离线但有历史记录的设备，验证它仍然留在列表里、状态不同。
+        var offline = PeerItemViewModel.FromKnown(new KnownDevice
+        {
+            Id = "demo-imac",
+            Name = "家里的 iMac",
+            LastSeenUtc = DateTime.UtcNow.AddHours(-5),
+        });
+        offline.IsPaired = true;
+        offline.HasHistory = true;
+
         _peers.Add(mac);
         _peers.Add(studio);
+        _peers.Add(offline);
         OnPropertyChanged(nameof(HasPeers));
         OnPropertyChanged(nameof(NoPeers));
         OnPropertyChanged(nameof(PeerCountText));

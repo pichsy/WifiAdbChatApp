@@ -8,6 +8,177 @@
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource AppBackgroundBrush}">
 
+  <TabControl x:Name="MainTabs" Padding="0">
+
+    <TabItem Header="📱  移动设备">
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="20" Spacing="12" MaxWidth="860" HorizontalAlignment="Stretch">
+
+          <!-- 设备 -->
+          <Border Background="{DynamicResource CardBrush}" CornerRadius="12" Padding="14"
+                  BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="设备" Classes="metaDim" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                  <ProgressBar IsIndeterminate="True" Width="60" Height="4"
+                               IsVisible="{Binding Mobile.Scanning}" VerticalAlignment="Center" />
+                  <Button Classes="icon" Content="↻" Click="OnMobileRefresh"
+                          ToolTip.Tip="刷新设备列表" />
+                </StackPanel>
+              </Grid>
+
+              <ComboBox ItemsSource="{Binding Mobile.Devices}"
+                        SelectedItem="{Binding Mobile.SelectedDevice, Mode=TwoWay}"
+                        HorizontalAlignment="Stretch"
+                        IsVisible="{Binding Mobile.HasDevices}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock Text="{Binding DisplayName}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+
+              <StackPanel Spacing="2" IsVisible="{Binding Mobile.NoDevices}">
+                <TextBlock Text="未检测到设备" FontSize="13" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextSecondaryBrush}" />
+                <TextBlock Text="{Binding Mobile.DeviceErrorText}" FontSize="11.5" TextWrapping="Wrap"
+                           Foreground="{DynamicResource TextTertiaryBrush}" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <!-- 发送文字 -->
+          <TextBlock Text="发送文字" Classes="sectionTitle" Margin="2,4,0,0" />
+          <Border Background="{DynamicResource CardBrush}" CornerRadius="12" Padding="14"
+                  BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="发送内容" Classes="metaDim" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Classes="link" Content="清空输入" Click="OnMobileClearInput" />
+              </Grid>
+
+              <TextBox x:Name="MobileInputBox"
+                       Text="{Binding Mobile.Input, Mode=TwoWay}"
+                       Watermark="输入要发送的文字，中文也可以"
+                       FontSize="20" Padding="12,8" />
+
+              <StackPanel Orientation="Horizontal" Spacing="18">
+                <CheckBox Content="先清空设备输入框" IsChecked="{Binding Mobile.ClearFirst, Mode=TwoWay}"
+                          IsEnabled="{Binding !Mobile.NeedsClipboard}" />
+                <CheckBox Content="发送后按回车键" IsChecked="{Binding Mobile.PressEnter, Mode=TwoWay}"
+                          IsEnabled="{Binding !Mobile.NeedsClipboard}" />
+              </StackPanel>
+
+              <TextBlock Text="{Binding Mobile.ClipboardHint}" Classes="metaDim" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+
+          <Button Classes="primary" Content="{Binding Mobile.SendButtonText}"
+                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                  IsEnabled="{Binding Mobile.CanSend}" Click="OnMobileSend" />
+
+          <TextBlock Text="{Binding Mobile.StatusText}" Classes="statusText"
+                     Classes.failure="{Binding Mobile.StatusIsFailure}" TextWrapping="Wrap" />
+
+          <!-- 最近发送 -->
+          <StackPanel Spacing="6" IsVisible="{Binding Mobile.HasHistory}">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="最近发送" Classes="metaDim" VerticalAlignment="Center" />
+              <Button Grid.Column="1" Classes="link" Content="清除记录" Click="OnMobileClearHistory" />
+            </Grid>
+            <ItemsControl ItemsSource="{Binding Mobile.History}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Button Classes="secondary" Margin="0,0,6,6" Padding="10,4"
+                          Content="{Binding}" Click="OnMobileUseHistory"
+                          ToolTip.Tip="点击填入输入框" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+
+          <!-- 保存到手机 -->
+          <TextBlock Text="文件传输" Classes="sectionTitle" Margin="2,4,0,0" />
+          <Border Background="{DynamicResource CardBrush}" CornerRadius="12" Padding="14"
+                  BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="保存到手机" Classes="metaDim" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Classes="link" Content="恢复默认" Click="OnMobileResetTargetDir" />
+              </Grid>
+              <TextBox Text="{Binding Mobile.TargetDir, Mode=TwoWay}"
+                       FontFamily="Consolas,Menlo,monospace" />
+              <TextBlock Text="{Binding Mobile.TargetDeviceText}" Classes="metaDim" />
+            </StackPanel>
+          </Border>
+
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <Button Classes="secondary" Content="选择文件…" Click="OnMobileChooseFiles" />
+            <Button Classes="link" Content="清空列表" Click="OnMobileClearFiles"
+                    IsVisible="{Binding Mobile.HasFiles}" />
+          </StackPanel>
+
+          <!-- 待传文件 -->
+          <StackPanel Spacing="6" IsVisible="{Binding Mobile.HasFiles}">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="待传文件" Classes="metaDim" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" Text="{Binding Mobile.TotalSizeText}" Classes="metaDim" />
+            </Grid>
+
+            <ItemsControl ItemsSource="{Binding Mobile.Files}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Background="{DynamicResource CardBrush}" CornerRadius="8" Padding="10,7"
+                          Margin="0,0,0,4">
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                      <StackPanel Spacing="2">
+                        <TextBlock Text="{Binding Name}" FontSize="12.5" TextTrimming="CharacterEllipsis"
+                                   Foreground="{DynamicResource TextPrimaryBrush}" />
+                        <TextBlock Text="{Binding SizeText}" Classes="metaDim"
+                                   IsVisible="{Binding !IsSending}" />
+                        <ProgressBar Value="{Binding Progress}" Maximum="1" Height="4"
+                                     IsVisible="{Binding IsSending}" />
+                        <TextBlock Text="{Binding Message}" FontSize="11" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource WarningBrush}"
+                                   IsVisible="{Binding HasMessage}" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="1" Text="{Binding BadgeText}" Classes="metaDim"
+                                 VerticalAlignment="Center" />
+                      <Button Grid.Column="2" Classes="link" Content="✕" Click="OnMobileRemoveFile" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="{Binding Mobile.PendingText}" Classes="metaDim" VerticalAlignment="Center" />
+              <Button Grid.Column="1" Classes="primary" Content="传到手机"
+                      IsEnabled="{Binding Mobile.CanPushFiles}" Click="OnMobilePush" />
+            </Grid>
+          </StackPanel>
+
+          <!-- adb 状态 -->
+          <Grid ColumnDefinitions="*,Auto" Margin="2,8,2,0">
+            <TextBlock Text="{Binding Mobile.AdbFooterText}" Classes="metaDim" TextWrapping="Wrap"
+                       VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+              <Button Classes="link" Content="重启 adb" Click="OnMobileRestartAdb"
+                      ToolTip.Tip="重启 adb 服务端：5037 被模拟器 / 手机助手占用时用这个恢复（会断开其它工具的连接）" />
+              <Button Classes="link" Content="设置 adb…" Click="OnMobilePickAdb" />
+            </StackPanel>
+          </Grid>
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+
+    <TabItem Header="💻  电脑设备">
   <Grid x:Name="RootGrid" ColumnDefinitions="260,*">
 
     <!-- ============ 左侧：设备列表 + 本机 ============ -->
@@ -15,7 +186,8 @@
             Background="{DynamicResource SidebarBrush}"
             BorderBrush="{DynamicResource DividerBrush}"
             BorderThickness="0,0,1,0">
-      <Grid RowDefinitions="Auto,*,Auto">
+      <!-- 0:标题 1:附近设备表头 2:可滚动列表 3:配对请求 4:本机(固定) 5:状态栏 -->
+      <Grid RowDefinitions="Auto,Auto,*,Auto,Auto,Auto">
 
         <StackPanel Grid.Row="0" Margin="16,14,16,6" Spacing="2">
           <TextBlock Text="文件互传助手"
@@ -26,19 +198,19 @@
                      Foreground="{DynamicResource TextTertiaryBrush}" />
         </StackPanel>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="10,0,10,10">
-          <StackPanel>
+        <!-- 附近设备：表头固定，只有下面的列表滚动 -->
+        <Grid Grid.Row="1" Margin="14,6,14,4" ColumnDefinitions="*,Auto">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="附近设备" Classes="sectionTitle" Margin="0" />
+            <Border Background="{DynamicResource RowHoverBrush}" CornerRadius="7" Padding="5,0">
+              <TextBlock Text="{Binding PeerCountText}" Classes="metaDim" VerticalAlignment="Center" />
+            </Border>
+          </StackPanel>
+          <TextBlock Grid.Column="1" Text="同一局域网" Classes="metaDim" VerticalAlignment="Center" />
+        </Grid>
 
-            <!-- 附近设备 -->
-            <Grid Margin="2,6,2,2" ColumnDefinitions="*,Auto">
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <TextBlock Text="附近设备" Classes="sectionTitle" Margin="0" />
-                <Border Background="{DynamicResource RowHoverBrush}" CornerRadius="7" Padding="5,0">
-                  <TextBlock Text="{Binding PeerCountText}" Classes="metaDim" VerticalAlignment="Center" />
-                </Border>
-              </StackPanel>
-              <TextBlock Grid.Column="1" Text="同一局域网" Classes="metaDim" VerticalAlignment="Center" />
-            </Grid>
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="10,0,10,10">
+          <StackPanel>
 
             <ItemsControl ItemsSource="{Binding Peers}">
               <ItemsControl.ItemTemplate>
@@ -63,9 +235,9 @@
                       </Grid>
 
                       <Grid Grid.Column="1" Grid.Row="1" ColumnDefinitions="*,Auto">
-                        <TextBlock Text="在线" Classes="metaDim" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding PresenceText}" Classes="metaDim" VerticalAlignment="Center" />
                         <Button Grid.Column="1" Classes="link" Content="配对…"
-                                IsVisible="{Binding CanPair}" Click="OnPairPeerClicked" />
+                                IsVisible="{Binding CanPairNow}" Click="OnPairPeerClicked" />
                       </Grid>
                     </Grid>
                   </Border>
@@ -85,8 +257,28 @@
               </StackPanel>
             </Border>
 
-            <!-- 本机 -->
-            <TextBlock Text="本机" Classes="sectionTitle" />
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- 配对请求：动作提示，固定在底部区域，不会被列表滚走 -->
+        <Border Grid.Row="3" IsVisible="{Binding HasPendingPair}"
+                Background="{DynamicResource PendingPairBrush}" CornerRadius="8"
+                Padding="10,9" Margin="12,0,12,8">
+          <StackPanel Spacing="4">
+            <TextBlock Text="{Binding PendingPairTitle}" FontSize="12.5" FontWeight="SemiBold"
+                       TextWrapping="Wrap" Foreground="{DynamicResource WarningBrush}" />
+            <TextBlock Text="{Binding PendingPairDetail}" FontSize="11" TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextSecondaryBrush}" />
+            <Button Classes="link" Content="知道了" HorizontalAlignment="Left"
+                    Click="OnDismissPairRequest" />
+          </StackPanel>
+        </Border>
+
+        <!-- 本机：固定在左下角，不随上面的设备列表滚动 -->
+        <Border Grid.Row="4" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,1,0,0"
+                Padding="12,10">
+          <StackPanel Spacing="6">
+            <TextBlock Text="本机" Classes="sectionTitle" Margin="0" />
             <Border Background="{DynamicResource CardBrush}" CornerRadius="10" Padding="12"
                     BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1">
               <StackPanel Spacing="9">
@@ -134,24 +326,10 @@
                 </Grid>
               </StackPanel>
             </Border>
-
-            <!-- 配对请求 -->
-            <Border IsVisible="{Binding HasPendingPair}"
-                    Background="{DynamicResource PendingPairBrush}" CornerRadius="8"
-                    Padding="10,9" Margin="0,8,0,0">
-              <StackPanel Spacing="4">
-                <TextBlock Text="{Binding PendingPairTitle}" FontSize="12.5" FontWeight="SemiBold"
-                           TextWrapping="Wrap" Foreground="{DynamicResource WarningBrush}" />
-                <TextBlock Text="{Binding PendingPairDetail}" FontSize="11" TextWrapping="Wrap"
-                           Foreground="{DynamicResource TextSecondaryBrush}" />
-                <Button Classes="link" Content="知道了" HorizontalAlignment="Left"
-                        Click="OnDismissPairRequest" />
-              </StackPanel>
-            </Border>
           </StackPanel>
-        </ScrollViewer>
+        </Border>
 
-        <Border Grid.Row="2" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,1,0,0"
+        <Border Grid.Row="5" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,1,0,0"
                 Padding="14,8">
           <StackPanel Spacing="5">
             <StackPanel Orientation="Horizontal" Spacing="6">
@@ -183,6 +361,9 @@
             <TextBlock Text="{Binding HeaderStatusText}" Classes="meta" />
           </StackPanel>
           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <Button Classes="secondary" Content="重新连接" IsVisible="{Binding HasSelectedPeer}"
+                    Click="OnReconnectSelected"
+                    ToolTip.Tip="立即探测一次对方是否可达（只建立 TCP 连接，不会触发对方的配对提示）" />
             <Button Classes="secondary" Content="配对…" IsVisible="{Binding ShowPairButton}"
                     Click="OnPairSelectedPeer" />
             <Button Classes="icon" Content="⋯" ToolTip.Tip="更多">
@@ -191,6 +372,7 @@
                   <MenuItem Header="清空记录" Click="OnClearMessages" />
                   <MenuItem Header="修改接收目录…" Click="OnChangeReceiveDir" />
                   <MenuItem Header="在文件管理器中打开接收目录" Click="OnOpenReceiveDir" />
+                  <MenuItem Header="打开运行日志…" Click="OnOpenLogFile" />
                 </MenuFlyout>
               </Button.Flyout>
             </Button>
@@ -273,11 +455,31 @@
               Padding="14,10">
         <StackPanel Spacing="8">
 
-          <!-- 发送进度 -->
-          <StackPanel Spacing="4" IsVisible="{Binding Busy}">
-            <ProgressBar Minimum="0" Maximum="1" Value="{Binding SendProgress}" Height="4" />
-            <TextBlock Text="{Binding SendLabelText}" Classes="meta" />
+          <!-- 发送进度（带百分比和取消） -->
+          <StackPanel Spacing="5" IsVisible="{Binding Busy}">
+            <Grid ColumnDefinitions="*,Auto,Auto">
+              <TextBlock Text="{Binding SendLabelText}" Classes="meta"
+                         TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" Text="{Binding SendPercentText}" Classes="meta"
+                         Margin="10,0,6,0" VerticalAlignment="Center" />
+              <Button Grid.Column="2" Classes="icon" Content="✕" FontSize="11" Padding="5,2"
+                      Click="OnCancelSend" ToolTip.Tip="取消这次发送" />
+            </Grid>
+            <ProgressBar Minimum="0" Maximum="1" Value="{Binding SendProgress}" Height="5" />
           </StackPanel>
+
+          <!-- 发送失败提示（醒目显示，避免用户以为「点了没反应」） -->
+          <Border IsVisible="{Binding HasSendError}" Background="{DynamicResource FailureTintBrush}"
+                  CornerRadius="8" Padding="10,8"
+                  BorderBrush="{DynamicResource FailureBrush}" BorderThickness="1">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="{Binding SendErrorText}" TextWrapping="Wrap" FontSize="12.5"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource FailureBrush}" />
+              <Button Grid.Column="1" Classes="icon" Content="✕" FontSize="11" Padding="5,2"
+                      Click="OnDismissSendError" ToolTip.Tip="关闭提示" />
+            </Grid>
+          </Border>
 
           <!-- 待发送文件 -->
           <Border IsVisible="{Binding HasStagedFiles}" Background="{DynamicResource CardBrush}"
@@ -373,4 +575,6 @@
       </Border>
     </Border>
   </Grid>
+    </TabItem>
+  </TabControl>
 </Window>

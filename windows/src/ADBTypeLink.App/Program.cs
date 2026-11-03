@@ -30,6 +30,12 @@ internal static class Program
         App.DemoMode = args.Contains("--demo", StringComparer.Ordinal);
         App.DemoHeavy = args.Contains("--demo-heavy", StringComparer.Ordinal);
 
+        var tabIndex = Array.IndexOf(args, "--tab");
+        if (tabIndex >= 0 && tabIndex + 1 < args.Length)
+        {
+            App.StartTab = args[tabIndex + 1];
+        }
+
         var themeIndex = Array.IndexOf(args, "--theme");
         if (themeIndex >= 0 && themeIndex + 1 < args.Length)
         {
