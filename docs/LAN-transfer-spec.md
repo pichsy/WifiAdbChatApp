@@ -181,14 +181,17 @@
 | --- | --- | --- |
 | 设备 ID | UserDefaults `lanDeviceID` | `%APPDATA%\\ADBTypeLink\\device.json`（或等价的 settings 文件） |
 | 已配对设备 ID 列表 | `~/Library/Application Support/ADBType/paired.json`，JSON 字符串数组，如 `["id1","id2"]` | `%APPDATA%\\ADBTypeLink\\paired.json`，同格式 |
-| 聊天记录 | `~/Library/Application Support/ADBType/chats/<设备ID>.json`（每设备独立会话） | `%APPDATA%\\ADBTypeLink\\chat.json`（单线程） |
-| 已配对好友列表（macOS） | `~/Library/Application Support/ADBType/friends.json`（id / name / host / port / lastSeen / alias） | 未实现（以 `paired.json` 为准） |
+| 聊天记录 | `~/Library/Application Support/ADBType/chats/<设备ID>.json`（每设备独立会话） | `%APPDATA%\\ADBTypeLink\\chats/<设备ID>.json`（每设备独立会话） |
+| 已配对好友列表 | `~/Library/Application Support/ADBType/friends.json`（id / name / host / port / lastSeen / alias） | `%APPDATA%\\ADBTypeLink\\devices.json`（id / name / lastSeen；暂不支持 alias） |
 | 接收目录 | UserDefaults `lanReceiveDir` | 设置文件；默认 `%USERPROFILE%\\Downloads\\ADBType 接收` |
 
 - Windows 端**不要**读写 macOS 的 `ADBType` 目录（在 macOS 上本地调试时请用 `~/Library/Application Support/ADBTypeLink/`，避免与正式 macOS 端数据冲突）。
-- **Windows 端**聊天记录仍是**单线程**（所有设备共用一条时间线，类似微信「文件传输助手」）；
-  **macOS 端（1.5 起）按设备独立缓存**：`chats/<设备ID>.json`，选中设备只显示该设备会话，
-  离线 / 重启后历史仍在，清空只影响当前会话。老版本 `chat.json` 会自动迁移并保留为 `chat.json.migrated`。
+- **两端都按设备独立缓存**：`chats/<设备ID>.json`，选中设备只显示该设备会话，
+  离线 / 重启后历史仍在，清空只影响当前会话。老版本单文件 `chat.json` 会自动迁移并保留为
+  `chat.json.migrated`；迁移时旧消息没有设备 ID，按 `peerName` 归到同名设备，读取时合并，
+  不会重复也不会丢。
+- 配对过或者有过消息来往的设备会进名册，**离线后仍留在列表**（显示「离线 · 上次 HH:mm」），
+  历史照常可查——连接状态不同不代表设备消失。
 - 每条消息元素字段：`id`(uuid)、`direction`(`incoming`/`outgoing`)、`peerName`、`date`、
   `kind`(`text`/`file`)、`text`、`fileName`、`filePath`、`fileSize`。
 - 每个设备会话最多保留 500 条；清空聊天记录**不删除**已收到的文件。
