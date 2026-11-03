@@ -21,6 +21,8 @@ Windows 端的「文件互传助手」局域网传输应用：和 macOS 端（`m
 windows/
 ├─ ADBTypeLink.sln
 ├─ build.ps1                       # Windows 构建脚本（Release + win-x64/win-arm64 发布 + 冒烟测试）
+├─ build-release.ps1               # 生成 release/ 下的安装包（发布 + NSIS 编译）
+├─ installer/setup.nsi             # NSIS 安装程序脚本（向导 / 桌面快捷方式 / 卸载）
 ├─ src/
 │  ├─ ADBTypeLink.Core/            # 跨平台类库：发现 / 协议 / 配对 / 持久化 / 收发
 │  ├─ ADBTypeLink.App/             # Avalonia 桌面端（微信式聊天 UI）
@@ -64,6 +66,24 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1
 .\build.ps1 -SkipSmokeTest               # 跳过冒烟测试
 .\build.ps1 -FrameworkDependent          # 发布框架依赖版本（体积小，目标机需装 .NET 8）
 ```
+
+### 生成安装包（release/）
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build-release.ps1
+```
+
+脚本先 `dotnet publish` 出 `publish\release-build\ADBTypeLink.App.exe`（自包含单文件），
+再用 NSIS 编译安装程序到仓库根目录：
+
+- `release\文件互传助手-1.2.0-安装包.exe`：带安装向导，按当前用户安装到
+  `%LOCALAPPDATA%\Programs\文件互传助手`（不需要管理员权限），
+  **完成页默认勾选「创建桌面快捷方式」**，同时创建开始菜单项和「设置 → 应用」卸载项；
+- 只重打安装包（复用现有 exe）：`-SkipBuild`；
+- 自定义工具路径：`-Dotnet <dotnet.exe> -Makensis <makensis.exe>`。
+
+安装脚本源码：[`installer/setup.nsi`](installer/setup.nsi)。已测过：安装（勾选 / 取消勾选桌面快捷方式）、
+静默安装 `/S`、卸载清理（程序目录 / 开始菜单 / 桌面快捷方式 / 注册表卸载项）。
 
 ### 手动构建
 
@@ -266,4 +286,6 @@ dotnet run --project src/ADBTypeLink.App -c Release -- --demo        # 用演示
 - 发送侧拒绝 0 字节文件（按 spec「读不到文件」），接收侧接受 0 字节文件。
 - 单文件大小受对端磁盘与 90 秒数据块读写超时限制；超长文件名在 Windows 上会替换非法字符。
 - 未做代码签名，Windows 首次运行可能出现 SmartScreen 提示（「更多信息 → 仍要运行」）。
-- `win-x64` / `win-arm64` 的自包含单文件发布已在 macOS 上验证可以生成（约 92 MB / 98 MB 的 `ADBTypeLink.App.exe`），但**未在真实 Windows 机器上运行过**；首次在 Windows 上运行建议先 `build.ps1 -SkipPublish` 并用 `dotnet run` 验证。
+- `win-x64` / `win-arm64` 的自包含单文件发布已在 macOS 上验证可以生成（约 92 MB / 98 MB 的 `ADBTypeLink.App.exe`）；
+  Windows 真机上已完成安装包（安装 / 桌面快捷方式 / 静默安装 / 卸载）验证，应用界面细节与双机互传
+  仍建议按 [`TESTING.md`](TESTING.md) 点一遍。
