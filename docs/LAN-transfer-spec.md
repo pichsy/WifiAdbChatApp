@@ -189,7 +189,8 @@
 - **两端都按设备独立缓存**：`chats/<设备ID>.json`，选中设备只显示该设备会话，
   离线 / 重启后历史仍在，清空只影响当前会话。老版本单文件 `chat.json` 会自动迁移并保留为
   `chat.json.migrated`；迁移时旧消息没有设备 ID，按 `peerName` 归到同名设备，读取时合并，
-  不会重复也不会丢。
+  不会重复也不会丢（macOS 1.5.1 起会把 `chat.json` / `chat.json.migrated` 一并按消息 id 合并，
+  旧文件归档到 `legacy-chat/`）。
 - 配对过或者有过消息来往的设备会进名册，**离线后仍留在列表**（显示「离线 · 上次 HH:mm」），
   历史照常可查——连接状态不同不代表设备消失。
 - 每条消息元素字段：`id`(uuid)、`direction`(`incoming`/`outgoing`)、`peerName`、`date`、

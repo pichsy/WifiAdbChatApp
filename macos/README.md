@@ -92,7 +92,7 @@ open 文件互传助手.app
 
 ```bash
 cd macos
-./package.sh        # 生成 macos/dist/文件互传助手-1.5.dmg 和 macos/dist/文件互传助手-1.5-macOS.zip
+./package.sh        # 生成 macos/dist/文件互传助手-1.5.1.dmg 和 macos/dist/文件互传助手-1.5.1-macOS.zip
 ```
 
 - dmg / zip 里带《安装说明.txt》和「授权并安装.sh」（可执行 shell 脚本）：在终端执行
@@ -157,6 +157,10 @@ adb -s <serial> shell input keyevent 66              # 回车
 
 ## 更新记录
 
+- **1.5.1**：修复已配对设备离线时顶部仍显示「搜索中」转圈、把好友列表盖住的问题；只要
+  有已配对设备就显示「已配对 N 台 · 在线 M 台」，离线好友照常列出、可查看历史。旧版遗留的
+  `chat.json` / `chat.json.migrated` 会合并导入对应设备会话（按消息 id 去重），旧文件归档到
+  `legacy-chat/`。**从 1.2 等旧版升级时请用 1.5.1 覆盖安装 `/Applications` 里的旧 App。**
 - **1.5**：每个设备独立会话：聊天记录按设备 ID 分开缓存（chats/<设备ID>.json），选中设备
   只显示该设备消息；离线 / 重启仍可查看；清空只影响当前会话；老 chat.json 自动迁移。
 - **1.4**：已配对设备支持本地别名：可修改、重启 / 重新扫到后优先显示；取消配对会清掉该设备

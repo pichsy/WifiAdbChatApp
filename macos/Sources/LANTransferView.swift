@@ -57,9 +57,13 @@ struct LANTransferView: View {
         return model.displayName(peer)
     }
 
+    private var hasKnownDevices: Bool {
+        !model.friends.isEmpty || !model.peers.isEmpty
+    }
+
     private var peerSummary: String {
         if model.reconnecting { return "正在重新连接…" }
-        if model.friends.isEmpty, model.peers.isEmpty { return "正在搜索局域网…" }
+        if !hasKnownDevices { return "正在搜索局域网…" }
         let online = model.peers.filter { $0.online }.count
         if model.friends.isEmpty {
             return "发现 \(model.peers.count) 台设备 · \(online) 台在线"
@@ -116,7 +120,7 @@ struct LANTransferView: View {
             .padding(.bottom, 10)
 
             HStack(spacing: 6) {
-                if model.reconnecting || model.peers.isEmpty {
+                if model.reconnecting || !hasKnownDevices {
                     ProgressView().controlSize(.small)
                         .scaleEffect(0.7)
                         .frame(width: 9, height: 9)

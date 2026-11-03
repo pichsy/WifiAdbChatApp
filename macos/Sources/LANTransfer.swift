@@ -462,7 +462,7 @@ final class LANModel: ObservableObject {
         pairedFileURL.deletingLastPathComponent().appendingPathComponent("chat.json")
     }
 
-    /// 加载每个设备自己的会话；老版本的单线程 chat.json 会一次性迁移到对应设备。
+    /// 加载每个设备自己的会话；旧版本遗留的 chat.json / chat.json.migrated 会合并导入后归档。
     private static func loadConversations(friends: [LANPeer]) -> [String: [LANMessage]] {
         var result: [String: [LANMessage]] = [:]
         let manager = FileManager.default
@@ -476,31 +476,54 @@ final class LANModel: ObservableObject {
             }
         }
 
-        if result.isEmpty,
-           let data = try? Data(contentsOf: legacyChatFileURL),
-           let legacy = try? JSONDecoder().decode([LANMessage].self, from: data),
-           !legacy.isEmpty {
-            let sorted = legacy.sorted { $0.date < $1.date }
-            var targetID: String?
-            if friends.count == 1 {
-                targetID = friends[0].id
-            } else if !friends.isEmpty {
-                // 多个好友时，按老消息里的设备名找消息最多的那台
-                var best: (id: String, count: Int)?
-                for friend in friends {
-                    let count = sorted.filter { $0.peerName == friend.name }.count
-                    if count > (best?.count ?? 0) { best = (friend.id, count) }
-                }
-                targetID = best?.id ?? friends[0].id
+        let legacyURLs = [legacyChatFileURL,
+                          legacyChatFileURL.appendingPathExtension("migrated")]
+            .filter { manager.fileExists(atPath: $0.path) }
+        var legacy: [LANMessage] = []
+        for url in legacyURLs {
+            guard let data = try? Data(contentsOf: url),
+                  let list = try? JSONDecoder().decode([LANMessage].self, from: data) else { continue }
+            legacy.append(contentsOf: list)
+        }
+        guard !legacy.isEmpty else { return result }
+
+        // 单好友直接归给它；多好友时按老消息里的设备名匹配消息最多的那台
+        var targetID: String?
+        if friends.count == 1 {
+            targetID = friends[0].id
+        } else if !friends.isEmpty {
+            var best: (id: String, count: Int)?
+            for friend in friends {
+                let count = legacy.filter { $0.peerName == friend.name }.count
+                if count > (best?.count ?? 0) { best = (friend.id, count) }
             }
-            if let targetID {
-                result[targetID] = sorted
-                if let encoded = try? JSONEncoder().encode(sorted) {
-                    try? encoded.write(to: chatFileURL(for: targetID), options: .atomic)
-                }
-                try? manager.moveItem(at: legacyChatFileURL,
-                                      to: legacyChatFileURL.appendingPathExtension("migrated"))
+            targetID = best?.id ?? friends[0].id
+        }
+        guard let targetID else { return result }
+
+        var merged = result[targetID] ?? []
+        var known = Set(merged.map { $0.id })
+        for message in legacy.sorted(by: { $0.date < $1.date }) where known.insert(message.id).inserted {
+            merged.append(message)
+        }
+        merged.sort { $0.date < $1.date }
+        if merged.count > 500 { merged.removeFirst(merged.count - 500) }
+        result[targetID] = merged
+        if let encoded = try? JSONEncoder().encode(merged) {
+            try? encoded.write(to: chatFileURL(for: targetID), options: .atomic)
+        }
+
+        // 归档旧文件，避免每次启动重复导入（消息按 id 去重，重复导入也不会重复）
+        let archive = chatsDirectory.deletingLastPathComponent()
+            .appendingPathComponent("legacy-chat", isDirectory: true)
+        try? manager.createDirectory(at: archive, withIntermediateDirectories: true)
+        for url in legacyURLs {
+            var destination = archive.appendingPathComponent(url.lastPathComponent)
+            if manager.fileExists(atPath: destination.path) {
+                destination = archive.appendingPathComponent(
+                    "\(url.lastPathComponent).\(Int(Date().timeIntervalSince1970))")
             }
+            try? manager.moveItem(at: url, to: destination)
         }
         return result
     }
@@ -674,13 +697,17 @@ final class LANModel: ObservableObject {
             } else if let begun = reconnectStartedAt, now.timeIntervalSince(begun) > 10 {
                 reconnecting = false
                 statusKind = .idle
-                statusText = "暂时没找到设备，正在继续自动搜索…"
+                statusText = friends.isEmpty
+                    ? "暂时没找到设备，正在继续自动搜索…"
+                    : "已配对设备仍离线，正在继续自动重连…"
             }
         }
 
         if peers.isEmpty, !reconnecting, !busy, statusKind != .failure {
             statusKind = .idle
-            statusText = "正在搜索局域网内的设备…"
+            statusText = friends.isEmpty
+                ? "正在搜索局域网内的设备…"
+                : "已配对设备暂时离线，正在自动重连…"
         } else if let peer = wentOffline, peer.id == selectedPeerID,
                   !busy, !reconnecting {
             statusKind = .idle
@@ -688,7 +715,9 @@ final class LANModel: ObservableObject {
         } else if !peers.isEmpty, onlinePeers.isEmpty,
                   !busy, !reconnecting {
             statusKind = .idle
-            statusText = "附近设备暂时离线，正在自动重连…"
+            statusText = friends.isEmpty
+                ? "附近设备暂时离线，正在自动重连…"
+                : "已配对设备暂时离线，正在自动重连…"
         }
     }
 
@@ -904,7 +933,9 @@ final class LANModel: ObservableObject {
 
         DispatchQueue.main.async {
             self.statusKind = .idle
-            self.statusText = "本机已上线，正在查找附近的设备…"
+            self.statusText = self.friends.isEmpty
+                ? "本机已上线，正在查找附近的设备…"
+                : "本机已上线，正在连接已配对设备…"
         }
     }
 
