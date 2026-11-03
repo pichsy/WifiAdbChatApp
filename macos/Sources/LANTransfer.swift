@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import Darwin
+import Network
 
 struct LANPeer: Identifiable, Equatable {
     let id: String
@@ -8,6 +9,21 @@ struct LANPeer: Identifiable, Equatable {
     var host: String
     var port: UInt16
     var lastSeen: Date
+    /// 最近 8 秒内收到过对方广播/单播心跳。离线设备仍保留在列表里，方便自动重连。
+    var online: Bool = true
+    /// 用户给已配对设备起的别名（本地缓存，优先于设备名显示）
+    var alias: String? = nil
+}
+
+/// 已配对设备的持久化记录（friends.json）：下次启动、对方离线时仍显示在左侧好友列表里。
+private struct StoredFriend: Codable {
+    var id: String
+    var name: String
+    var host: String
+    var port: UInt16
+    var lastSeen: Date
+    /// 别名；旧版 friends.json 没有这个字段，解码时按 nil 处理
+    var alias: String? = nil
 }
 
 /// 聊天式收发记录：收到的和发出去的文字/文件都留在这里
@@ -73,11 +89,18 @@ final class LANModel: ObservableObject {
     static let protocolVersion = 1
     static let discoveryPort: UInt16 = 52730
     private static let receiveDirKey = "lanReceiveDir"
+    /// 超过这个时间没收到心跳就标记为「离线」，但先保留在列表里等自动重连。
+    private static let offlineThreshold: TimeInterval = 8
+    /// 离线设备在列表里保留的时长，超过才真正移除，避免界面上的设备突然消失。
+    private static let offlineRetention: TimeInterval = 120
 
     // MARK: - 界面状态
 
     @Published var peers: [LANPeer] = []
-    @Published var messages: [LANMessage] = []
+    /// 已配对设备的好友列表：从 friends.json 恢复，扫到后自动更新在线状态
+    @Published var friends: [LANPeer] = []
+    /// 每个设备独立的聊天记录缓存：key = 设备 ID，value = 该设备的会话
+    @Published var conversations: [String: [LANMessage]] = [:]
     @Published var deviceName: String = ""
     @Published var pairingCode: String = ""
     @Published var receiveDir: String {
@@ -94,11 +117,17 @@ final class LANModel: ObservableObject {
     @Published var busy = false
     @Published var sendProgress: Double = 0
     @Published var activeSendLabel = ""
+    /// 正在重新建立发现 / 监听套接字（网络切换、睡眠唤醒或手动重连时）
+    @Published var reconnecting = false
+    /// 当前发送是否支持取消（文字 / 文件支持；配对 / 重连过程不显示取消按钮）
+    @Published var canCancelSend = false
 
     // MARK: - 网络
 
     private let defaults = UserDefaults.standard
     private let netQueue = DispatchQueue(label: "dev.local.adbtype.lan", qos: .utility)
+    /// 发送单独一条队列：大文件传输再久也不能阻塞发现 / 心跳，否则界面会把对端误判为离线。
+    private let sendQueue = DispatchQueue(label: "dev.local.adbtype.send", qos: .userInitiated)
     private let pairLock = NSLock()
 
     private let deviceID: String
@@ -112,6 +141,15 @@ final class LANModel: ObservableObject {
     private var pruneTimer: Timer?
     private var tcpPort: UInt16 = 0
     private var started = false
+    private var pathMonitor: NWPathMonitor?
+    private var lastPathSignature: String?
+    private var wakeObserver: NSObjectProtocol?
+    private var activityToken: NSObjectProtocol?
+    private var lastRestartAt = Date.distantPast
+    private var reconnectStartedAt: Date?
+    private let sendStateLock = NSLock()
+    private var activeSendFD: Int32 = -1
+    private var sendCancelled = false
 
     // MARK: - 初始化
 
@@ -132,12 +170,43 @@ final class LANModel: ObservableObject {
         pairingCode = Self.makePairingCode()
         paired = Self.loadPaired()
         pairedCount = paired.count
-        messages = Self.loadMessages()
+        friends = Self.loadFriends(paired: paired)
+        conversations = Self.loadConversations(friends: friends)
 
+        // 旧版本只存了配对 ID，用最近聊天记录里的名字补全好友显示名
+        if paired.count == 1,
+           let recentName = conversations.values.flatMap({ $0 })
+               .max(by: { $0.date < $1.date })?.peerName,
+           !recentName.isEmpty,
+           let index = friends.firstIndex(where: { $0.name == "已配对设备" && $0.host.isEmpty }) {
+            friends[index].name = recentName
+            saveFriends()
+        }
+
+        // 恢复上次选中的好友；没有就选最近见过的已配对设备
+        if let saved = store.string(forKey: "lanSelectedPeerID"),
+           friends.contains(where: { $0.id == saved }) {
+            selectedPeerID = saved
+        } else {
+            selectedPeerID = friends.max(by: { $0.lastSeen < $1.lastSeen })?.id
+        }
+
+        // 对端中途断开 / 用户取消发送时，向已关闭的连接写数据会触发 SIGPIPE，
+        // 默认行为是直接杀进程。忽略它，让 send() 返回 -1，走正常的错误 / 取消流程。
+        _ = Darwin.signal(SIGPIPE, SIG_IGN)
+
+        // 关掉 App Nap，避免窗口不在前台时心跳定时器被降频、设备看起来「掉线」
+        activityToken = ProcessInfo.processInfo.beginActivity(
+            options: [.userInitiatedAllowingIdleSystemSleep],
+            reason: "局域网设备发现与文字、文件传输")
         start()
     }
 
     deinit {
+        if let wakeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
+        }
+        pathMonitor?.cancel()
         announceTimer?.cancel()
         pruneTimer?.invalidate()
         udpSource?.cancel()
@@ -145,6 +214,9 @@ final class LANModel: ObservableObject {
         if udpRecvFD >= 0 { close(udpRecvFD) }
         if udpSendFD >= 0 { close(udpSendFD) }
         if tcpListenFD >= 0 { close(tcpListenFD) }
+        if let activityToken {
+            ProcessInfo.processInfo.endActivity(activityToken)
+        }
     }
 
     private static func makePairingCode() -> String {
@@ -167,6 +239,38 @@ final class LANModel: ObservableObject {
             return []
         }
         return Set(list)
+    }
+
+    private static var friendsFileURL: URL {
+        pairedFileURL.deletingLastPathComponent().appendingPathComponent("friends.json")
+    }
+
+    /// 好友列表 = friends.json 里记录过的设备 + 旧版 paired.json 里只有 ID 的设备（名字等上线后补全）
+    private static func loadFriends(paired: Set<String>) -> [LANPeer] {
+        var result: [LANPeer] = []
+        if let data = try? Data(contentsOf: friendsFileURL),
+           let list = try? JSONDecoder().decode([StoredFriend].self, from: data) {
+            result = list.map {
+                LANPeer(id: $0.id, name: $0.name, host: $0.host, port: $0.port,
+                        lastSeen: $0.lastSeen, online: false, alias: $0.alias)
+            }
+        }
+        let known = Set(result.map { $0.id })
+        for id in paired where !known.contains(id) {
+            result.append(LANPeer(id: id, name: "已配对设备", host: "", port: 0,
+                                  lastSeen: .distantPast, online: false))
+        }
+        return result.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    private func saveFriends() {
+        let records = friends.map {
+            StoredFriend(id: $0.id, name: $0.name, host: $0.host,
+                         port: $0.port, lastSeen: $0.lastSeen, alias: $0.alias)
+        }
+        if let data = try? JSONEncoder().encode(records) {
+            try? data.write(to: Self.friendsFileURL, options: .atomic)
+        }
     }
 
     private func savePaired() {
@@ -193,40 +297,264 @@ final class LANModel: ObservableObject {
         }
     }
 
-    // MARK: - 聊天记录持久化
+    // MARK: - 好友列表（已配对设备常驻左侧）
 
-    private static var chatFileURL: URL {
+    /// 配对成功后写入好友列表，下次启动直接显示，扫到后自动恢复在线状态。
+    private func rememberFriend(_ peer: LANPeer) {
+        DispatchQueue.main.async {
+            self.upsertFriend(id: peer.id, name: peer.name, host: peer.host, port: peer.port)
+        }
+    }
+
+    private func rememberFriend(id: String, name: String, host: String, port: UInt16) {
+        DispatchQueue.main.async {
+            self.upsertFriend(id: id, name: name, host: host, port: port)
+        }
+    }
+
+    private func upsertFriend(id: String, name: String, host: String, port: UInt16) {
+        if let index = friends.firstIndex(where: { $0.id == id }) {
+            var friend = friends[index]
+            if !name.isEmpty { friend.name = name }
+            if !host.isEmpty { friend.host = host }
+            if port > 0 { friend.port = port }
+            friend.lastSeen = Date()
+            friends[index] = friend
+        } else {
+            friends.append(LANPeer(id: id, name: name.isEmpty ? "已配对设备" : name,
+                                   host: host, port: port, lastSeen: Date(), online: false))
+            friends.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        }
+        saveFriends()
+        if selectedPeerID == nil { selectPeer(id) }
+    }
+
+    /// 扫到好友时更新记录里的名字 / 地址 / 端口，离线时也能记住上次位置。
+    private func updateFriend(from peer: LANPeer) {
+        guard let index = friends.firstIndex(where: { $0.id == peer.id }) else {
+            if isPaired(peer.id) {
+                upsertFriend(id: peer.id, name: peer.name, host: peer.host, port: peer.port)
+            }
+            return
+        }
+        var friend = friends[index]
+        var changed = false
+        if !peer.name.isEmpty, friend.name != peer.name {
+            friend.name = peer.name
+            changed = true
+        }
+        if !peer.host.isEmpty, friend.host != peer.host {
+            friend.host = peer.host
+            changed = true
+        }
+        if peer.port > 0, friend.port != peer.port {
+            friend.port = peer.port
+            changed = true
+        }
+        friend.lastSeen = Date()
+        friends[index] = friend
+        if changed { saveFriends() }
+    }
+
+    func selectPeer(_ peerID: String?) {
+        selectedPeerID = peerID
+        defaults.set(peerID, forKey: "lanSelectedPeerID")
+    }
+
+    /// 从「已发现设备」或「已配对好友」里找当前可发送的对象（在线设备带上好友的别名）
+    func peer(for peerID: String) -> LANPeer? {
+        let friend = friends.first { $0.id == peerID }
+        if var discovered = peers.first(where: { $0.id == peerID }) {
+            discovered.alias = friend?.alias
+            return discovered
+        }
+        return friend
+    }
+
+    func isOnline(_ peerID: String) -> Bool {
+        peers.first { $0.id == peerID }?.online ?? false
+    }
+
+    func alias(for peerID: String) -> String? {
+        guard let raw = friends.first(where: { $0.id == peerID })?.alias else { return nil }
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    /// 显示名：有别名优先用别名，否则用设备名
+    func displayName(_ peer: LANPeer) -> String {
+        if let alias = peer.alias, !alias.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return alias
+        }
+        return peer.name
+    }
+
+    func displayName(for peerID: String) -> String {
+        guard let peer = peer(for: peerID) else { return "设备" }
+        return displayName(peer)
+    }
+
+    /// 聊天记录里只存了当时的设备名，这里按设备名 / 别名回查，让历史消息也跟随别名显示
+    func displayName(forRemoteName name: String) -> String {
+        if let friend = friends.first(where: { $0.name == name || $0.alias == name }) {
+            return displayName(friend)
+        }
+        return name
+    }
+
+    var hasAliases: Bool {
+        friends.contains { !(($0.alias ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
+    }
+
+    /// 设置别名；传空字符串等于清除别名（回退显示设备名）
+    func setAlias(_ alias: String, for peerID: String) {
+        guard let index = friends.firstIndex(where: { $0.id == peerID }) else { return }
+        let trimmed = alias.trimmingCharacters(in: .whitespacesAndNewlines)
+        friends[index].alias = trimmed.isEmpty ? nil : trimmed
+        saveFriends()
+        statusKind = .success
+        statusText = trimmed.isEmpty
+            ? "已清除「\(friends[index].name)」的别名"
+            : "已把「\(friends[index].name)」的别名设为「\(trimmed)」"
+    }
+
+    /// 清除全部设备的别名缓存；配对关系保持不变
+    func clearAliases() {
+        guard hasAliases else { return }
+        for index in friends.indices { friends[index].alias = nil }
+        saveFriends()
+        statusKind = .success
+        statusText = "已清除全部别名缓存（配对关系不受影响）"
+    }
+
+    /// 左侧「附近设备」：当前发现但还没配对的设备
+    var nearbyPeers: [LANPeer] {
+        peers.filter { !isPaired($0.id) }
+    }
+
+    /// 左侧「已配对」：好友里在线的排前面
+    var sortedFriends: [LANPeer] {
+        friends.sorted {
+            let leftOnline = isOnline($0.id)
+            let rightOnline = isOnline($1.id)
+            if leftOnline != rightOnline { return leftOnline }
+            return displayName($0).localizedStandardCompare(displayName($1)) == .orderedAscending
+        }
+    }
+
+    // MARK: - 聊天记录持久化（按设备独立缓存）
+
+    private static var chatsDirectory: URL {
+        let dir = pairedFileURL.deletingLastPathComponent()
+            .appendingPathComponent("chats", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    private static func chatFileURL(for peerID: String) -> URL {
+        let safe = peerID
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: ":", with: "_")
+        return chatsDirectory.appendingPathComponent("\(safe).json")
+    }
+
+    private static var legacyChatFileURL: URL {
         pairedFileURL.deletingLastPathComponent().appendingPathComponent("chat.json")
     }
 
-    private static func loadMessages() -> [LANMessage] {
-        guard let data = try? Data(contentsOf: chatFileURL),
-              let list = try? JSONDecoder().decode([LANMessage].self, from: data) else {
-            return []
-        }
-        return list.sorted { $0.date < $1.date }
-    }
-
-    private func saveMessages() {
-        guard let data = try? JSONEncoder().encode(messages) else { return }
-        try? data.write(to: Self.chatFileURL, options: .atomic)
-    }
-
-    private func appendMessage(_ message: LANMessage) {
-        DispatchQueue.main.async {
-            self.messages.append(message)
-            if self.messages.count > 500 {
-                self.messages.removeFirst(self.messages.count - 500)
+    /// 加载每个设备自己的会话；老版本的单线程 chat.json 会一次性迁移到对应设备。
+    private static func loadConversations(friends: [LANPeer]) -> [String: [LANMessage]] {
+        var result: [String: [LANMessage]] = [:]
+        let manager = FileManager.default
+        if let files = try? manager.contentsOfDirectory(at: chatsDirectory,
+                                                        includingPropertiesForKeys: nil) {
+            for file in files where file.pathExtension == "json" {
+                let peerID = file.deletingPathExtension().lastPathComponent
+                guard let data = try? Data(contentsOf: file),
+                      let list = try? JSONDecoder().decode([LANMessage].self, from: data) else { continue }
+                result[peerID] = list.sorted { $0.date < $1.date }
             }
-            self.saveMessages()
+        }
+
+        if result.isEmpty,
+           let data = try? Data(contentsOf: legacyChatFileURL),
+           let legacy = try? JSONDecoder().decode([LANMessage].self, from: data),
+           !legacy.isEmpty {
+            let sorted = legacy.sorted { $0.date < $1.date }
+            var targetID: String?
+            if friends.count == 1 {
+                targetID = friends[0].id
+            } else if !friends.isEmpty {
+                // 多个好友时，按老消息里的设备名找消息最多的那台
+                var best: (id: String, count: Int)?
+                for friend in friends {
+                    let count = sorted.filter { $0.peerName == friend.name }.count
+                    if count > (best?.count ?? 0) { best = (friend.id, count) }
+                }
+                targetID = best?.id ?? friends[0].id
+            }
+            if let targetID {
+                result[targetID] = sorted
+                if let encoded = try? JSONEncoder().encode(sorted) {
+                    try? encoded.write(to: chatFileURL(for: targetID), options: .atomic)
+                }
+                try? manager.moveItem(at: legacyChatFileURL,
+                                      to: legacyChatFileURL.appendingPathExtension("migrated"))
+            }
+        }
+        return result
+    }
+
+    private func saveConversation(_ peerID: String) {
+        let list = conversations[peerID] ?? []
+        if list.isEmpty {
+            try? FileManager.default.removeItem(at: Self.chatFileURL(for: peerID))
+            return
+        }
+        if let data = try? JSONEncoder().encode(list) {
+            try? data.write(to: Self.chatFileURL(for: peerID), options: .atomic)
         }
     }
 
-    func clearMessages() {
-        messages.removeAll()
-        saveMessages()
+    func messages(for peerID: String?) -> [LANMessage] {
+        guard let peerID else { return [] }
+        return conversations[peerID] ?? []
+    }
+
+    func messageCount(for peerID: String?) -> Int {
+        messages(for: peerID).count
+    }
+
+    var totalMessageCount: Int {
+        conversations.values.reduce(0) { $0 + $1.count }
+    }
+
+    private func appendMessage(_ message: LANMessage, peerID: String) {
+        DispatchQueue.main.async {
+            var list = self.conversations[peerID] ?? []
+            list.append(message)
+            if list.count > 500 {
+                list.removeFirst(list.count - 500)
+            }
+            self.conversations[peerID] = list
+            self.saveConversation(peerID)
+        }
+    }
+
+    func clearMessages(for peerID: String?) {
+        guard let peerID else { return }
+        conversations[peerID] = []
+        saveConversation(peerID)
         statusKind = .idle
-        statusText = "消息记录已清空，已收到的文件不会被删除"
+        statusText = "已清空当前设备的聊天记录，已收到的文件不会被删除"
+    }
+
+    func clearAllMessages() {
+        let ids = Array(conversations.keys)
+        conversations.removeAll()
+        for peerID in ids { saveConversation(peerID) }
+        statusKind = .idle
+        statusText = "已清空全部设备的聊天记录，已收到的文件不会被删除"
     }
 
     func isPaired(_ peerID: String) -> Bool {
@@ -240,6 +568,9 @@ final class LANModel: ObservableObject {
         paired.removeAll()
         pairLock.unlock()
         savePaired()
+        friends.removeAll()
+        saveFriends()
+        selectPeer(nil)
         pairedCount = 0
         statusKind = .idle
         statusText = "已清除配对记录，下次发送需要重新输入配对码"
@@ -251,6 +582,9 @@ final class LANModel: ObservableObject {
         let count = paired.count
         pairLock.unlock()
         if removed { savePaired() }
+        friends.removeAll { $0.id == peer.id }
+        saveFriends()
+        if selectedPeerID == peer.id { selectPeer(friends.first?.id) }
         pairedCount = count
         statusKind = .idle
         statusText = "已取消与「\(peer.name)」的配对，下次发送需要重新输入配对码"
@@ -275,14 +609,181 @@ final class LANModel: ObservableObject {
         netQueue.async { [weak self] in
             self?.openSockets()
         }
-        pruneTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            self.peers.removeAll { Date().timeIntervalSince($0.lastSeen) > 8 }
-            if let selected = self.selectedPeerID, !self.peers.contains(where: { $0.id == selected }) {
-                self.selectedPeerID = self.peers.first?.id
+
+        // 睡眠唤醒后套接字可能已经失效，重新建立并立刻广播
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+                self?.autoReconnect(reason: "电脑刚从睡眠中唤醒")
             }
-            if self.peers.isEmpty, self.statusKind == .idle {
-                self.statusText = "正在搜索局域网内的设备…"
+
+        // Wi-Fi / 有线网络切换（含断网恢复）时自动重连
+        let monitor = NWPathMonitor()
+        monitor.pathUpdateHandler = { [weak self] path in
+            guard let self else { return }
+            let signature = "\(path.status) " + path.availableInterfaces.map { $0.name }.joined(separator: ",")
+            guard let previous = self.lastPathSignature else {
+                self.lastPathSignature = signature
+                return
+            }
+            guard signature != previous else { return }
+            self.lastPathSignature = signature
+            guard path.status == .satisfied else { return }
+            self.restartNetwork(force: false, message: "网络已切换，正在自动重连…")
+        }
+        monitor.start(queue: netQueue)
+        pathMonitor = monitor
+
+        pruneTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            self.refreshPeerPresence()
+        }
+    }
+
+    /// 每 2 秒刷新在线状态：先标记离线（保留在列表里），2 分钟都收不到心跳才移除。
+    private func refreshPeerPresence() {
+        let now = Date()
+        var wentOffline: LANPeer?
+        for index in peers.indices {
+            let online = now.timeIntervalSince(peers[index].lastSeen) <= Self.offlineThreshold
+            if peers[index].online != online {
+                peers[index].online = online
+                if !online { wentOffline = peers[index] }
+            }
+        }
+
+        let before = peers.count
+        peers.removeAll { now.timeIntervalSince($0.lastSeen) > Self.offlineRetention }
+        if peers.count != before,
+           let selected = selectedPeerID,
+           !peers.contains(where: { $0.id == selected }),
+           !friends.contains(where: { $0.id == selected }) {
+            let next = friends.first(where: { isOnline($0.id) })?.id
+                ?? peers.first(where: { $0.online })?.id
+                ?? peers.first?.id
+                ?? friends.first?.id
+            selectPeer(next)
+        }
+
+        let onlinePeers = peers.filter { $0.online }
+
+        if reconnecting {
+            if !onlinePeers.isEmpty {
+                reconnecting = false
+                statusKind = .success
+                statusText = "已重新连接，当前 \(onlinePeers.count) 台设备在线"
+            } else if let begun = reconnectStartedAt, now.timeIntervalSince(begun) > 10 {
+                reconnecting = false
+                statusKind = .idle
+                statusText = "暂时没找到设备，正在继续自动搜索…"
+            }
+        }
+
+        if peers.isEmpty, !reconnecting, !busy, statusKind != .failure {
+            statusKind = .idle
+            statusText = "正在搜索局域网内的设备…"
+        } else if let peer = wentOffline, peer.id == selectedPeerID,
+                  !busy, !reconnecting {
+            statusKind = .idle
+            statusText = "「\(peer.name)」暂时离线，正在自动重连…"
+        } else if !peers.isEmpty, onlinePeers.isEmpty,
+                  !busy, !reconnecting {
+            statusKind = .idle
+            statusText = "附近设备暂时离线，正在自动重连…"
+        }
+    }
+
+    // MARK: - 重连
+
+    /// 手动重连：重新建立发现/监听套接字，并立即广播一轮。
+    func reconnectAll() {
+        guard !busy else {
+            statusKind = .failure
+            statusText = "正在发送，请稍后再重连"
+            return
+        }
+        DispatchQueue.main.async {
+            self.reconnecting = true
+            self.reconnectStartedAt = Date()
+            self.statusKind = .idle
+            self.statusText = "正在重新连接…"
+        }
+        netQueue.async { [weak self] in
+            self?.restartNetwork(force: true)
+        }
+    }
+
+    /// 对指定设备手动重连：先单播心跳，已配对的再做一次 TCP 握手探活。
+    func reconnect(to peer: LANPeer, completion: @escaping (LANOutcome) -> Void) {
+        guard !busy else {
+            completion(.failure("正在发送，请稍后再试"))
+            return
+        }
+        beginSend(label: "重连 \(peer.name)", cancellable: false)
+        sendQueue.async { [weak self] in
+            guard let self else { return }
+            self.netQueue.async { [weak self] in
+                self?.sendUnicastAnnouncement(toHost: peer.host)
+            }
+            if self.isPaired(peer.id) {
+                if let fd = self.connectWithRetry(to: peer, attempts: 2) {
+                    let result = self.handshake(fd, peer: peer, code: nil)
+                    close(fd)
+                    if case .ok = result {
+                        self.markPeerOnline(peer)
+                        self.finish(.ok, completion,
+                                    successText: "已重新连接「\(peer.name)」")
+                        return
+                    }
+                }
+                self.finish(.failure("暂时连不上「\(peer.name)」，后台会继续自动重连"),
+                            completion)
+            } else {
+                self.finish(.ok, completion,
+                            successText: "已向「\(peer.name)」发出重连请求，等待对方回应…")
+            }
+        }
+    }
+
+    private func autoReconnect(reason: String) {
+        netQueue.async { [weak self] in
+            self?.restartNetwork(force: false, message: "\(reason)，正在自动重连…")
+        }
+    }
+
+    /// 重新建立 UDP/TCP 套接字。必须在 netQueue 上调用。
+    private func restartNetwork(force: Bool, message: String = "正在重新连接…") {
+        let now = Date()
+        if !force, now.timeIntervalSince(lastRestartAt) < 2 { return }
+        lastRestartAt = now
+        teardownNetwork()
+        openSockets()
+        announce()
+        DispatchQueue.main.async {
+            self.reconnecting = true
+            self.reconnectStartedAt = Date()
+            self.statusKind = .idle
+            self.statusText = message
+        }
+    }
+
+    private func teardownNetwork() {
+        announceTimer?.cancel()
+        announceTimer = nil
+        udpSource?.cancel()
+        udpSource = nil
+        tcpSource?.cancel()
+        tcpSource = nil
+        if udpRecvFD >= 0 { close(udpRecvFD); udpRecvFD = -1 }
+        if udpSendFD >= 0 { close(udpSendFD); udpSendFD = -1 }
+        if tcpListenFD >= 0 { close(tcpListenFD); tcpListenFD = -1 }
+        tcpPort = 0
+    }
+
+    private func markPeerOnline(_ peer: LANPeer) {
+        DispatchQueue.main.async {
+            if let index = self.peers.firstIndex(where: { $0.id == peer.id }) {
+                self.peers[index].lastSeen = Date()
+                self.peers[index].online = true
             }
         }
     }
@@ -350,6 +851,11 @@ final class LANModel: ObservableObject {
             return
         }
 
+        // 监听套接字必须非阻塞：下面的 accept 循环在拿到一个连接后如果继续 accept，
+        // 阻塞模式下会永远卡在这里，把整个发现 / 发送队列一起冻住（对端就会被误判离线）。
+        let listenFlags = fcntl(listenFD, F_GETFL, 0)
+        _ = fcntl(listenFD, F_SETFL, listenFlags | O_NONBLOCK)
+
         var actualAddr = sockaddr_in()
         var actualLen = socklen_t(MemoryLayout<sockaddr_in>.size)
         _ = withUnsafeMutablePointer(to: &actualAddr) {
@@ -372,6 +878,14 @@ final class LANModel: ObservableObject {
                     }
                 }
                 if client < 0 { break }
+                var noSigPipe: Int32 = 1
+                setsockopt(client, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe,
+                           socklen_t(MemoryLayout<Int32>.size))
+                // macOS 上 accept 出来的 socket 会继承监听端的 O_NONBLOCK；
+                // 后续 handleClient 按「阻塞 + 30 秒超时」读写，这里必须把非阻塞标志清掉，
+                // 否则 hello 之后的内容（文字 / 文件字节）会被当成 EOF 直接断开。
+                let clientFlags = fcntl(client, F_GETFL, 0)
+                _ = fcntl(client, F_SETFL, clientFlags & ~O_NONBLOCK)
                 DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                     self?.handleClient(client)
                 }
@@ -401,8 +915,8 @@ final class LANModel: ObservableObject {
         }
     }
 
-    private func announce() {
-        guard udpSendFD >= 0, tcpPort != 0 else { return }
+    private func announcementPayload() -> Data? {
+        guard tcpPort != 0 else { return nil }
         let payload: [String: Any] = [
             "app": Self.appTag,
             "v": Self.protocolVersion,
@@ -410,7 +924,11 @@ final class LANModel: ObservableObject {
             "name": deviceName,
             "port": Int(tcpPort)
         ]
-        guard let data = try? JSONSerialization.data(withJSONObject: payload) else { return }
+        return try? JSONSerialization.data(withJSONObject: payload)
+    }
+
+    private func announce() {
+        guard udpSendFD >= 0, let data = announcementPayload() else { return }
 
         var broadcastAddr = sockaddr_in()
         broadcastAddr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
@@ -426,6 +944,37 @@ final class LANModel: ObservableObject {
         loopAddr.sin_port = Self.discoveryPort.bigEndian
         loopAddr.sin_addr = in_addr(s_addr: inet_addr("127.0.0.1"))
         sendPacket(data, to: &loopAddr)
+
+        // 广播在酒店 / 公司 Wi-Fi 上经常被 AP 过滤或丢包。再给已知设备单播发一份
+        // 同样的心跳（报文格式完全不变），对端只要收到就能刷新在线状态。
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            // 已配对好友即使离线也保留在列表里，同样给它们单播心跳
+            let hosts = Set(self.peers.map { $0.host } + self.friends.map { $0.host })
+                .filter { !$0.isEmpty }
+            guard !hosts.isEmpty else { return }
+            self.netQueue.async { [weak self] in
+                guard let self else { return }
+                for host in hosts {
+                    self.sendUnicastAnnouncement(data: data, toHost: host)
+                }
+            }
+        }
+    }
+
+    private func sendUnicastAnnouncement(toHost host: String) {
+        guard let data = announcementPayload() else { return }
+        sendUnicastAnnouncement(data: data, toHost: host)
+    }
+
+    private func sendUnicastAnnouncement(data: Data, toHost host: String) {
+        guard udpSendFD >= 0 else { return }
+        var address = sockaddr_in()
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_port = Self.discoveryPort.bigEndian
+        inet_pton(AF_INET, host, &address.sin_addr)
+        sendPacket(data, to: &address)
     }
 
     private func sendPacket(_ data: Data, to address: inout sockaddr_in) {
@@ -469,15 +1018,30 @@ final class LANModel: ObservableObject {
                            port: UInt16(portValue), lastSeen: Date())
         DispatchQueue.main.async {
             if let index = self.peers.firstIndex(where: { $0.id == peerID }) {
+                let wasOffline = !self.peers[index].online
                 self.peers[index] = peer
+                self.updateFriend(from: peer)
+                if wasOffline {
+                    self.reconnecting = false
+                    self.statusKind = .success
+                    self.statusText = self.isPaired(peerID)
+                        ? "「\(peer.name)」已重新连接，可以直接发消息"
+                        : "「\(peer.name)」已重新连接"
+                }
             } else {
                 self.peers.append(peer)
                 self.peers.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+                self.updateFriend(from: peer)
                 if self.selectedPeerID == nil {
-                    self.selectedPeerID = peerID
+                    self.selectPeer(peerID)
                 }
-                self.statusKind = .idle
-                self.statusText = "发现 \(self.peers.count) 台设备"
+                if self.isPaired(peerID) {
+                    self.statusKind = .success
+                    self.statusText = "「\(peer.name)」已上线，可以直接发消息"
+                } else {
+                    self.statusKind = .idle
+                    self.statusText = "发现 \(self.peers.count) 台设备"
+                }
             }
         }
     }
@@ -492,14 +1056,15 @@ final class LANModel: ObservableObject {
             return
         }
         beginSend(label: "文字")
-        netQueue.async { [weak self] in
+        sendQueue.async { [weak self] in
             guard let self else { return }
             self.performText(value, peer: peer, code: code) { [weak self] outcome in
                 guard let self else { return }
                 if case .ok = outcome {
                     self.appendMessage(LANMessage(direction: .outgoing,
                                                   peerName: peer.name,
-                                                  text: value))
+                                                  text: value),
+                                       peerID: peer.id)
                 }
                 completion(outcome)
             }
@@ -508,27 +1073,61 @@ final class LANModel: ObservableObject {
 
     private func performText(_ text: String, peer: LANPeer, code: String?,
                              completion: @escaping (LANOutcome) -> Void) {
-        guard let fd = connect(to: peer) else {
-            finish(.failure("连不上 \(peer.name)，请确认两台设备在同一局域网、对方应用已打开"), completion)
+        guard let fd = connectWithRetry(to: peer) else {
+            // 失败后立刻补发一次单播心跳，触发对方的在线状态刷新（心跳只在 netQueue 上操作 socket）
+            netQueue.async { [weak self] in
+                self?.sendUnicastAnnouncement(toHost: peer.host)
+            }
+            if isSendCancelled {
+                finishCancelled(completion)
+            } else {
+                finish(.failure("连不上「\(peer.name)」，已自动重试 3 次；正在后台自动重连，稍后可直接重发"), completion)
+            }
             return
         }
-        defer { close(fd) }
+        trackSendSocket(fd)
+        defer { closeSendSocket(fd) }
+
+        if isSendCancelled {
+            finishCancelled(completion)
+            return
+        }
 
         switch handshake(fd, peer: peer, code: code) {
         case .ok:
+            if isSendCancelled {
+                finishCancelled(completion)
+                return
+            }
             guard writeJSON(fd, ["type": "text", "text": text]),
                   let responseData = readFrame(fd),
                   let response = jsonObject(responseData),
                   response["type"] as? String == "ok" else {
-                finish(.failure("发送文字失败，对方没有确认"), completion)
+                if isSendCancelled {
+                    finishCancelled(completion)
+                } else {
+                    finish(.failure("发送文字失败，对方没有确认"), completion)
+                }
                 return
             }
             _ = writeJSON(fd, ["type": "bye"])
-            finish(.ok, completion, successText: "已把文字发送给 \(peer.name)")
+            if isSendCancelled {
+                finishCancelled(completion)
+            } else {
+                finish(.ok, completion, successText: "已把文字发送给 \(peer.name)")
+            }
         case .needsPairing(let name):
-            finish(.needsPairing(peerName: name), completion)
+            if isSendCancelled {
+                finishCancelled(completion)
+            } else {
+                finish(.needsPairing(peerName: name), completion)
+            }
         case .failure(let message):
-            finish(.failure(message), completion)
+            if isSendCancelled {
+                finishCancelled(completion)
+            } else {
+                finish(.failure(message), completion)
+            }
         }
     }
 
@@ -539,22 +1138,9 @@ final class LANModel: ObservableObject {
             return
         }
         beginSend(label: urls.count == 1 ? urls[0].lastPathComponent : "\(urls.count) 个文件")
-        netQueue.async { [weak self] in
+        sendQueue.async { [weak self] in
             guard let self else { return }
-            self.performFiles(urls, peer: peer, code: code) { [weak self] outcome in
-                guard let self else { return }
-                if case .ok = outcome {
-                    for url in urls {
-                        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
-                        let size = (attributes?[.size] as? NSNumber)?.intValue
-                        self.appendMessage(LANMessage(direction: .outgoing,
-                                                      peerName: peer.name,
-                                                      fileURL: url,
-                                                      fileSize: size))
-                    }
-                }
-                completion(outcome)
-            }
+            self.performFiles(urls, peer: peer, code: code, completion: completion)
         }
     }
 
@@ -566,11 +1152,14 @@ final class LANModel: ObservableObject {
             completion(.failure("配对码是 6 位数字"))
             return
         }
-        beginSend(label: "配对")
-        netQueue.async { [weak self] in
+        beginSend(label: "配对", cancellable: false)
+        sendQueue.async { [weak self] in
             guard let self else { return }
-            guard let fd = self.connect(to: peer) else {
-                self.finish(.failure("连不上 \(peer.name)，请确认两台设备在同一局域网、对方应用已打开"), completion)
+            guard let fd = self.connectWithRetry(to: peer, attempts: 2) else {
+                self.netQueue.async { [weak self] in
+                    self?.sendUnicastAnnouncement(toHost: peer.host)
+                }
+                self.finish(.failure("连不上「\(peer.name)」，正在后台自动重连"), completion)
                 return
             }
             defer { close(fd) }
@@ -592,6 +1181,11 @@ final class LANModel: ObservableObject {
         var currentCode = code
 
         for (index, url) in urls.enumerated() {
+            if isSendCancelled {
+                finishCancelled(completion)
+                return
+            }
+
             let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
             let size = (attributes?[.size] as? NSNumber)?.intValue ?? 0
             guard size > 0 else {
@@ -606,20 +1200,34 @@ final class LANModel: ObservableObject {
                 self.sendProgress = urls.count > 1 ? Double(index) / Double(urls.count) : 0
             }
 
-            guard let fd = connect(to: peer) else {
-                finish(.failure("连不上 \(peer.name)，请确认两台设备在同一局域网、对方应用已打开"), completion)
+            guard let fd = connectWithRetry(to: peer) else {
+                netQueue.async { [weak self] in
+                    self?.sendUnicastAnnouncement(toHost: peer.host)
+                }
+                if isSendCancelled {
+                    finishCancelled(completion)
+                } else {
+                    finish(.failure("连不上「\(peer.name)」，已自动重试 3 次；正在后台自动重连，稍后可直接重发"), completion)
+                }
+                return
+            }
+            trackSendSocket(fd)
+
+            if isSendCancelled {
+                closeSendSocket(fd)
+                finishCancelled(completion)
                 return
             }
 
             let handshakeResult = handshake(fd, peer: peer, code: currentCode)
             switch handshakeResult {
             case .needsPairing(let name):
-                close(fd)
-                finish(.needsPairing(peerName: name), completion)
+                closeSendSocket(fd)
+                if isSendCancelled { finishCancelled(completion) } else { finish(.needsPairing(peerName: name), completion) }
                 return
             case .failure(let message):
-                close(fd)
-                finish(.failure(message), completion)
+                closeSendSocket(fd)
+                if isSendCancelled { finishCancelled(completion) } else { finish(.failure(message), completion) }
                 return
             case .ok:
                 currentCode = nil
@@ -628,21 +1236,26 @@ final class LANModel: ObservableObject {
             guard writeJSON(fd, ["type": "file",
                                  "name": url.lastPathComponent,
                                  "size": size]) else {
-                close(fd)
-                finish(.failure("发送文件信息失败"), completion)
+                closeSendSocket(fd)
+                if isSendCancelled { finishCancelled(completion) } else { finish(.failure("发送文件信息失败"), completion) }
                 return
             }
 
             guard let handle = try? FileHandle(forReadingFrom: url) else {
-                close(fd)
+                closeSendSocket(fd)
                 finish(.failure("读不到文件：\(url.lastPathComponent)"), completion)
                 return
             }
 
             var sentBytes = 0
             var failed = false
+            var cancelled = false
 
             while true {
+                if isSendCancelled {
+                    cancelled = true
+                    break
+                }
                 let chunk: Data?
                 do {
                     chunk = try handle.read(upToCount: 256 * 1024)
@@ -653,7 +1266,7 @@ final class LANModel: ObservableObject {
                 }
                 guard let chunk, !chunk.isEmpty else { break }
                 guard writeAll(fd, chunk) else {
-                    failed = true
+                    if isSendCancelled { cancelled = true } else { failed = true }
                     break
                 }
                 sentBytes += chunk.count
@@ -665,8 +1278,14 @@ final class LANModel: ObservableObject {
             }
             try? handle.close()
 
+            if cancelled || isSendCancelled {
+                closeSendSocket(fd)
+                finishCancelled(completion)
+                return
+            }
+
             if failed {
-                close(fd)
+                closeSendSocket(fd)
                 finish(.failure("网络中断，文件没发完"), completion)
                 return
             }
@@ -674,13 +1293,27 @@ final class LANModel: ObservableObject {
             guard let responseData = readFrame(fd),
                   let response = jsonObject(responseData),
                   response["type"] as? String == "ok" else {
-                close(fd)
-                finish(.failure("对方没有确认收到文件"), completion)
+                closeSendSocket(fd)
+                if isSendCancelled { finishCancelled(completion) } else { finish(.failure("对方没有确认收到文件"), completion) }
                 return
             }
 
             _ = writeJSON(fd, ["type": "bye"])
-            close(fd)
+            closeSendSocket(fd)
+
+            // 每个文件成功就立刻记进聊天记录：中途取消时，已经发出去的文件也留痕
+            let fileSize = (try? FileManager.default.attributesOfItem(atPath: url.path))
+                .flatMap { ($0[.size] as? NSNumber)?.intValue }
+            appendMessage(LANMessage(direction: .outgoing,
+                                     peerName: peer.name,
+                                     fileURL: url,
+                                     fileSize: fileSize),
+                          peerID: peer.id)
+        }
+
+        if isSendCancelled {
+            finishCancelled(completion)
+            return
         }
 
         let message = urls.count == 1
@@ -689,11 +1322,13 @@ final class LANModel: ObservableObject {
         finish(.ok, completion, successText: message)
     }
 
-    private func beginSend(label: String) {
+    private func beginSend(label: String, cancellable: Bool = true) {
+        resetSendCancellation()
         DispatchQueue.main.async {
             self.busy = true
             self.sendProgress = 0
             self.activeSendLabel = label
+            self.canCancelSend = cancellable
             self.statusKind = .idle
             self.statusText = "正在连接…"
         }
@@ -706,6 +1341,7 @@ final class LANModel: ObservableObject {
             self.busy = false
             self.sendProgress = 0
             self.activeSendLabel = ""
+            self.canCancelSend = false
             switch outcome {
             case .ok:
                 self.statusKind = .success
@@ -719,6 +1355,63 @@ final class LANModel: ObservableObject {
             }
             completion?(outcome)
         }
+    }
+
+    /// 用户点 X 主动取消：不显示成红色错误
+    private func finishCancelled(_ completion: ((LANOutcome) -> Void)? = nil) {
+        DispatchQueue.main.async {
+            self.busy = false
+            self.sendProgress = 0
+            self.activeSendLabel = ""
+            self.canCancelSend = false
+            self.statusKind = .idle
+            self.statusText = "已取消发送"
+        }
+        completion?(.failure("已取消发送"))
+    }
+
+    // MARK: - 取消发送
+
+    /// 取消当前发送：置取消标记 + shutdown 当前 socket，让阻塞中的读写立刻返回。
+    func cancelSend() {
+        guard busy, canCancelSend else { return }
+        sendStateLock.lock()
+        sendCancelled = true
+        let fd = activeSendFD
+        sendStateLock.unlock()
+        if fd >= 0 { shutdown(fd, SHUT_RDWR) }
+        DispatchQueue.main.async {
+            self.statusKind = .idle
+            self.statusText = "正在取消发送…"
+        }
+    }
+
+    private var isSendCancelled: Bool {
+        sendStateLock.lock()
+        defer { sendStateLock.unlock() }
+        return sendCancelled
+    }
+
+    private func resetSendCancellation() {
+        sendStateLock.lock()
+        sendCancelled = false
+        activeSendFD = -1
+        sendStateLock.unlock()
+    }
+
+    private func trackSendSocket(_ fd: Int32) {
+        sendStateLock.lock()
+        activeSendFD = fd
+        let alreadyCancelled = sendCancelled
+        sendStateLock.unlock()
+        if alreadyCancelled { shutdown(fd, SHUT_RDWR) }
+    }
+
+    private func closeSendSocket(_ fd: Int32) {
+        sendStateLock.lock()
+        if activeSendFD == fd { activeSendFD = -1 }
+        sendStateLock.unlock()
+        close(fd)
     }
 
     // MARK: - 握手
@@ -749,6 +1442,7 @@ final class LANModel: ObservableObject {
         switch type {
         case "hello_ok":
             rememberPaired(peer.id)
+            rememberFriend(peer)
             return .ok
         case "pair_required":
             return .needsPairing(response["name"] as? String ?? peer.name)
@@ -793,6 +1487,9 @@ final class LANModel: ObservableObject {
             rememberPaired(peerID)
         }
 
+        // 对方主动连过来时也刷新好友记录（端口未知，等对方广播时补全）
+        rememberFriend(id: peerID, name: peerName, host: remoteHost(fd), port: 0)
+
         guard writeJSON(fd, ["type": "hello_ok", "name": deviceName, "id": deviceID]) else {
             return
         }
@@ -814,7 +1511,8 @@ final class LANModel: ObservableObject {
                 guard let text = obj["text"] as? String else { return }
                 self.appendMessage(LANMessage(direction: .incoming,
                                               peerName: peerName,
-                                              text: text))
+                                              text: text),
+                                   peerID: peerID)
                 DispatchQueue.main.async {
                     self.statusKind = .success
                     self.statusText = "收到 \(peerName) 发来的文字"
@@ -837,7 +1535,8 @@ final class LANModel: ObservableObject {
                 self.appendMessage(LANMessage(direction: .incoming,
                                               peerName: peerName,
                                               fileURL: url,
-                                              fileSize: size))
+                                              fileSize: size),
+                                   peerID: peerID)
                 DispatchQueue.main.async {
                     self.statusKind = .success
                     self.statusText = "已收到「\(url.lastPathComponent)」，存在 \(url.deletingLastPathComponent().path)"
@@ -899,9 +1598,40 @@ final class LANModel: ObservableObject {
 
     // MARK: - 网络工具
 
+    private func remoteHost(_ fd: Int32) -> String {
+        var addr = sockaddr_in()
+        var len = socklen_t(MemoryLayout<sockaddr_in>.size)
+        let result = withUnsafeMutablePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                getpeername(fd, $0, &len)
+            }
+        }
+        guard result == 0 else { return "" }
+        var chars = [CChar](repeating: 0, count: Int(INET_ADDRSTRLEN))
+        var address = addr.sin_addr
+        inet_ntop(AF_INET, &address, &chars, socklen_t(INET_ADDRSTRLEN))
+        return String(cString: chars)
+    }
+
+    /// 发送前自动重试连接几次，避开 Wi-Fi 抖动 / 对端刚启动时的偶发失败。
+    private func connectWithRetry(to peer: LANPeer, attempts: Int = 3) -> Int32? {
+        guard attempts > 0 else { return nil }
+        for attempt in 1...attempts {
+            if isSendCancelled { return nil }
+            if let fd = connect(to: peer) { return fd }
+            if attempt < attempts {
+                Thread.sleep(forTimeInterval: attempt == 1 ? 0.6 : 1.4)
+            }
+        }
+        return nil
+    }
+
     private func connect(to peer: LANPeer, timeoutSeconds: Int32 = 6) -> Int32? {
         let fd = socket(AF_INET, SOCK_STREAM, 0)
         guard fd >= 0 else { return nil }
+        var noSigPipe: Int32 = 1
+        setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe,
+                   socklen_t(MemoryLayout<Int32>.size))
 
         var address = sockaddr_in()
         address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)

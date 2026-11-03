@@ -45,6 +45,9 @@
   - 以报文的**来源 IP**（不是 payload 里的字段）+ `port` 生成/更新 peer 记录；同一 `id` 只保留一条，每次收到刷新 `lastSeen`。
   - `v` 不等于 1 时仍接受（向前兼容），仅记录日志。
 - 超过 **8 秒**没收到某设备广播，则从「附近设备」列表移除（每 3 秒清理一次）。
+  macOS 端会先把设备标记为「离线」并保留在列表里，2 分钟收不到心跳才移除。
+- macOS 端除广播外，还会向已知设备（含已配对好友）的 `IP:52730` 单播同样的心跳报文；
+  报文格式不变，接收方按本节规则正常处理。这样在 AP 过滤广播 / 丢包的环境里也能保持在线。
 - 设备按名称排序；新设备出现、选中项消失时更新界面。
 
 > 同机多实例兜底：多个进程绑定同一 UDP 端口时，发往 `127.0.0.1` 的单播只会投递给其中
@@ -178,13 +181,17 @@
 | --- | --- | --- |
 | 设备 ID | UserDefaults `lanDeviceID` | `%APPDATA%\\ADBTypeLink\\device.json`（或等价的 settings 文件） |
 | 已配对设备 ID 列表 | `~/Library/Application Support/ADBType/paired.json`，JSON 字符串数组，如 `["id1","id2"]` | `%APPDATA%\\ADBTypeLink\\paired.json`，同格式 |
-| 聊天记录 | `~/Library/Application Support/ADBType/chat.json` | `%APPDATA%\\ADBTypeLink\\chat.json` |
+| 聊天记录 | `~/Library/Application Support/ADBType/chats/<设备ID>.json`（每设备独立会话） | `%APPDATA%\\ADBTypeLink\\chat.json`（单线程） |
+| 已配对好友列表（macOS） | `~/Library/Application Support/ADBType/friends.json`（id / name / host / port / lastSeen / alias） | 未实现（以 `paired.json` 为准） |
 | 接收目录 | UserDefaults `lanReceiveDir` | 设置文件；默认 `%USERPROFILE%\\Downloads\\ADBType 接收` |
 
 - Windows 端**不要**读写 macOS 的 `ADBType` 目录（在 macOS 上本地调试时请用 `~/Library/Application Support/ADBTypeLink/`，避免与正式 macOS 端数据冲突）。
-- 聊天记录是**单线程**（所有设备共用一条时间线，类似微信「文件传输助手」），元素字段：
-  `id`(uuid)、`direction`(`incoming`/`outgoing`)、`peerName`、`date`、`kind`(`text`/`file`)、`text`、`fileName`、`filePath`、`fileSize`。
-- 最多保留 500 条；清空聊天记录**不删除**已收到的文件。
+- **Windows 端**聊天记录仍是**单线程**（所有设备共用一条时间线，类似微信「文件传输助手」）；
+  **macOS 端（1.5 起）按设备独立缓存**：`chats/<设备ID>.json`，选中设备只显示该设备会话，
+  离线 / 重启后历史仍在，清空只影响当前会话。老版本 `chat.json` 会自动迁移并保留为 `chat.json.migrated`。
+- 每条消息元素字段：`id`(uuid)、`direction`(`incoming`/`outgoing`)、`peerName`、`date`、
+  `kind`(`text`/`file`)、`text`、`fileName`、`filePath`、`fileSize`。
+- 每个设备会话最多保留 500 条；清空聊天记录**不删除**已收到的文件。
 
 ---
 
@@ -236,6 +243,23 @@
 - 发送中：显示进度条（多文件时显示总进度）与「正在发送 <文件名>…」；发送期间禁止重复发送。
 - 收到配对请求（对方在等你给码）：侧栏/聊天区显示「「<name>」正在请求配对，把本机配对码告诉对方」。
 - 清空记录需二次确认；文案说明不会删除已收到文件。
+
+### 9.3 macOS 端增强（Windows 待同步）
+
+在不改变协议的前提下，macOS 端额外做了：
+
+- 左侧列表分「已配对」和「附近设备」两组：配对过的设备（friends.json）常驻，离线也保留；
+- 扫到已配对设备直接恢复在线 / 配对关系，不弹配对框；选中好友即可发消息；
+- 设备心跳丢失先显示「离线 · 正在重连」，同时向已知设备单播心跳；
+- 侧栏刷新按钮 = 重新建立发现 / 监听并广播；聊天头部或好友行的「重连」= 对当前设备
+  单播心跳 + 已配对时做 TCP 握手探活；
+- 网络切换 / 睡眠唤醒自动重建套接字；发送连接失败自动重试 3 次；
+- 已配对设备支持本地别名（alias，存在 friends.json）：可修改，重启 / 重新扫到后优先显示，
+  取消配对时一并清除；⋯ 菜单可清除全部别名缓存；
+- 每个设备独立会话（chats/<设备ID>.json）：选中设备只显示该设备消息，离线仍可查看，
+  「清空当前会话」不影响其他设备；
+- 发送中显示进度百分比，并支持 X 取消（取消后不影响下一次发送）；
+- 防 App Nap，避免窗口在后台时心跳被降频。
 
 ---
 

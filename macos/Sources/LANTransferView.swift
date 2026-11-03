@@ -26,6 +26,8 @@ struct LANTransferView: View {
     @State private var codeInput = ""
     @State private var pairingError: String?
     @State private var showClearConfirm = false
+    @State private var aliasTarget: LANPeer?
+    @State private var aliasDraft = ""
     @FocusState private var codeFocused: Bool
     @FocusState private var composerFocused: Bool
 
@@ -38,12 +40,31 @@ struct LANTransferView: View {
 
     private var selectedPeer: LANPeer? {
         guard let id = model.selectedPeerID else { return nil }
-        return model.peers.first { $0.id == id }
+        return model.peer(for: id)
     }
 
     private var selectedPeerPaired: Bool {
         guard let peer = selectedPeer else { return false }
         return model.isPaired(peer.id)
+    }
+
+    private var selectedMessages: [LANMessage] {
+        model.messages(for: model.selectedPeerID)
+    }
+
+    private var selectedPeerDisplayName: String {
+        guard let peer = selectedPeer else { return "对方" }
+        return model.displayName(peer)
+    }
+
+    private var peerSummary: String {
+        if model.reconnecting { return "正在重新连接…" }
+        if model.friends.isEmpty, model.peers.isEmpty { return "正在搜索局域网…" }
+        let online = model.peers.filter { $0.online }.count
+        if model.friends.isEmpty {
+            return "发现 \(model.peers.count) 台设备 · \(online) 台在线"
+        }
+        return "已配对 \(model.friends.count) 台 · 在线 \(online) 台"
     }
 
     // MARK: - 主体
@@ -57,6 +78,9 @@ struct LANTransferView: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .sheet(item: $pairing) { request in
             pairingSheet(request)
+        }
+        .sheet(item: $aliasTarget) { peer in
+            aliasEditorSheet(peer)
         }
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
@@ -92,19 +116,31 @@ struct LANTransferView: View {
             .padding(.bottom, 10)
 
             HStack(spacing: 6) {
-                if model.peers.isEmpty {
+                if model.reconnecting || model.peers.isEmpty {
                     ProgressView().controlSize(.small)
                         .scaleEffect(0.7)
                         .frame(width: 9, height: 9)
                 } else {
                     Circle()
-                        .fill(Color.green)
+                        .fill(model.peers.contains(where: { $0.online }) ? Color.green : Color.orange)
                         .frame(width: 7, height: 7)
                 }
-                Text(model.peers.isEmpty ? "正在搜索局域网…" : "发现 \(model.peers.count) 台设备")
+                Text(peerSummary)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
                 Spacer(minLength: 0)
+                Button {
+                    model.reconnectAll()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.caption)
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .disabled(model.busy)
+                .help("重新搜索并连接附近的设备")
+                .accessibilityLabel("重新连接设备")
             }
             .padding(.horizontal, 14)
             .padding(.bottom, 6)
@@ -113,11 +149,20 @@ struct LANTransferView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 3) {
-                    if model.peers.isEmpty {
+                    if model.friends.isEmpty, model.nearbyPeers.isEmpty {
                         emptyPeersHint
                     } else {
-                        ForEach(model.peers) { peer in
-                            peerRow(peer)
+                        if !model.friends.isEmpty {
+                            sectionTitle("已配对", count: model.friends.count)
+                            ForEach(model.sortedFriends) { friend in
+                                peerRow(model.peer(for: friend.id) ?? friend)
+                            }
+                        }
+                        if !model.nearbyPeers.isEmpty {
+                            sectionTitle("附近设备", count: model.nearbyPeers.count)
+                            ForEach(model.nearbyPeers) { peer in
+                                peerRow(peer)
+                            }
                         }
                     }
                 }
@@ -133,6 +178,21 @@ struct LANTransferView: View {
         }
         .frame(width: sidebarWidth)
         .background(Self.sidebarBackground)
+    }
+
+    private func sectionTitle(_ title: String, count: Int) -> some View {
+        HStack(spacing: 5) {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text("\(count)")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 6)
+        .padding(.top, 8)
+        .padding(.bottom, 2)
     }
 
     private var emptyPeersHint: some View {
@@ -156,6 +216,7 @@ struct LANTransferView: View {
     private func peerRow(_ peer: LANPeer) -> some View {
         let selected = model.selectedPeerID == peer.id
         let paired = model.isPaired(peer.id)
+        let display = model.displayName(peer)
         return HStack(spacing: 8) {
             ZStack {
                 Circle()
@@ -167,15 +228,16 @@ struct LANTransferView: View {
             .frame(width: 30, height: 30)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(peer.name)
+                Text(display)
                     .font(.callout.weight(selected ? .semibold : .regular))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
+                    .help(peer.alias == nil ? peer.name : "设备名：(peer.name)")
                 HStack(spacing: 4) {
                     Circle()
-                        .fill(Color.green)
+                        .fill(peer.online ? Color.green : Color.orange)
                         .frame(width: 5, height: 5)
-                    Text("在线")
+                    Text(peer.online ? "在线" : "离线 · 正在重连")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                     Text(paired ? "· 已配对" : "· 未配对")
@@ -186,30 +248,89 @@ struct LANTransferView: View {
 
             Spacer(minLength: 0)
 
-            if !paired {
-                Button("配对") { beginPairing(peer) }
+            if paired, !peer.online {
+                Button("重连") { model.reconnect(to: peer) { _ in } }
                     .buttonStyle(.borderless)
                     .font(.caption)
                     .foregroundStyle(Color.accentColor)
                     .disabled(model.busy)
-                    .help("输入对方屏幕上显示的 6 位配对码")
+                    .help("重新连接「\(display)」")
+            } else if !paired {
+                Button("配对") { beginPairing(peer) }
+                    .buttonStyle(.borderless)
+                    .font(.caption)
+                    .foregroundStyle(Color.accentColor)
+                    .disabled(model.busy || !peer.online)
+                    .help(peer.online ? "输入对方屏幕上显示的 6 位配对码" : "设备离线，配对前需要先重新连接")
             }
         }
+        .opacity(peer.online ? 1 : 0.72)
         .padding(.vertical, 6)
         .padding(.horizontal, 8)
         .contentShape(Rectangle())
-        .onTapGesture { model.selectedPeerID = peer.id }
+        .onTapGesture { model.selectPeer(peer.id) }
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(selected ? Color.accentColor.opacity(0.10) : Color.clear)
         )
         .contextMenu {
-            Button("选中这台设备") { model.selectedPeerID = peer.id }
-            Button("配对…") { beginPairing(peer) }
+            Button("选中这台设备") { model.selectPeer(peer.id) }
+            Button("重新连接这台设备") { model.reconnect(to: peer) { _ in } }
+            if !paired {
+                Button("配对…") { beginPairing(peer) }
+            }
             if paired {
-                Button("取消与「\(peer.name)」的配对") { model.forget(peer) }
+                Button("设置别名…") { beginAliasEdit(peer) }
+                if !(peer.alias ?? "").trimmingCharacters(in: .whitespaces).isEmpty {
+                    Button("清除别名") { model.setAlias("", for: peer.id) }
+                }
+                Button("取消与「\(display)」的配对") { model.forget(peer) }
             }
         }
+    }
+
+    // MARK: - 别名
+
+    private func beginAliasEdit(_ peer: LANPeer) {
+        aliasDraft = peer.alias ?? ""
+        aliasTarget = peer
+    }
+
+    private func saveAlias(_ peer: LANPeer) {
+        model.setAlias(aliasDraft, for: peer.id)
+        aliasTarget = nil
+    }
+
+    private func aliasEditorSheet(_ peer: LANPeer) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Image(systemName: "tag")
+                    .foregroundStyle(Color.accentColor)
+                Text("设置别名")
+                    .font(.headline)
+            }
+            Text("给「\(peer.name)」起一个本地别名，只有这台 Mac 会用它显示；留空保存等于清除别名。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            TextField(peer.name, text: $aliasDraft)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit { saveAlias(peer) }
+            HStack {
+                Button("清除别名") {
+                    aliasDraft = ""
+                    saveAlias(peer)
+                }
+                .disabled((peer.alias ?? "").isEmpty && aliasDraft.isEmpty)
+                Spacer(minLength: 12)
+                Button("取消") { aliasTarget = nil }
+                    .keyboardShortcut(.cancelAction)
+                Button("保存") { saveAlias(peer) }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 380)
     }
 
     private var localDeviceCard: some View {
@@ -369,11 +490,11 @@ struct LANTransferView: View {
         .onDrop(of: [UTType.fileURL.identifier], isTargeted: $isFileDropTarget) { providers in
             handleDrop(providers)
         }
-        .alert("清空全部消息记录？", isPresented: $showClearConfirm) {
+        .alert("清空当前设备的聊天记录？", isPresented: $showClearConfirm) {
             Button("取消", role: .cancel) {}
-            Button("清空", role: .destructive) { model.clearMessages() }
+            Button("清空", role: .destructive) { model.clearMessages(for: model.selectedPeerID) }
         } message: {
-            Text("只清空这里的聊天列表，已经收到的文件不会被删除。")
+            Text("只清空当前选中设备的会话，已经收到的文件不会被删除；其他设备的聊天记录不受影响。")
         }
     }
 
@@ -389,7 +510,7 @@ struct LANTransferView: View {
             .frame(width: 38, height: 38)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(selectedPeer?.name ?? "文件传输")
+                Text(selectedPeer.map { model.displayName($0) } ?? "文件传输")
                     .font(.headline)
                     .lineLimit(1)
                 Text(headerSubtitle)
@@ -399,6 +520,18 @@ struct LANTransferView: View {
             }
 
             Spacer(minLength: 8)
+
+            if let peer = selectedPeer, !peer.online {
+                Button {
+                    model.reconnect(to: peer) { _ in }
+                } label: {
+                    Label("重连", systemImage: "arrow.clockwise")
+                }
+                .controlSize(.small)
+                .disabled(model.busy)
+                .help("重新连接「\(model.displayName(peer))」")
+                .accessibilityLabel("重连当前设备")
+            }
 
             if let peer = selectedPeer, !selectedPeerPaired {
                 Button {
@@ -412,8 +545,25 @@ struct LANTransferView: View {
             }
 
             Menu {
-                Button("清空聊天记录…") { showClearConfirm = true }
-                    .disabled(model.messages.isEmpty)
+                Button("重新搜索附近设备") { model.reconnectAll() }
+                if let peer = selectedPeer, !peer.online {
+                    Button("重新连接「\(model.displayName(peer))」") {
+                        model.reconnect(to: peer) { _ in }
+                    }
+                }
+                if let peer = selectedPeer, selectedPeerPaired {
+                    Button("设置别名…") { beginAliasEdit(peer) }
+                    if model.alias(for: peer.id) != nil {
+                        Button("清除「\(model.displayName(peer))」的别名") {
+                            model.setAlias("", for: peer.id)
+                        }
+                    }
+                }
+                Button("清除全部别名缓存") { model.clearAliases() }
+                    .disabled(!model.hasAliases)
+                Divider()
+                Button("清空当前会话记录…") { showClearConfirm = true }
+                    .disabled(selectedMessages.isEmpty)
                 Divider()
                 Button("修改接收目录…") { model.chooseReceiveDir() }
                 Button("在访达中打开接收目录") {
@@ -438,8 +588,13 @@ struct LANTransferView: View {
     }
 
     private var headerSubtitle: String {
-        guard selectedPeer != nil else {
-            return model.messages.isEmpty ? "在左侧选择设备，开始像聊天一样互传" : "共 \(model.messages.count) 条记录 · 在左侧选择发送目标"
+        guard let peer = selectedPeer else {
+            return model.totalMessageCount == 0
+                ? "在左侧选择设备，查看和它各自的聊天记录"
+                : "共 \(model.totalMessageCount) 条记录 · 选择设备查看各自会话"
+        }
+        if !peer.online {
+            return "离线 · 正在自动重连，也可以点右侧「重连」"
         }
         if selectedPeerPaired {
             return "在线 · 已配对，可直接发送文字和文件"
@@ -474,11 +629,11 @@ struct LANTransferView: View {
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                if model.messages.isEmpty {
+                if selectedMessages.isEmpty {
                     emptyChatHint
                 } else {
                     LazyVStack(alignment: .leading, spacing: 14) {
-                        ForEach(model.messages) { message in
+                        ForEach(selectedMessages) { message in
                             messageRow(message)
                                 .id(message.id)
                         }
@@ -488,7 +643,7 @@ struct LANTransferView: View {
                 }
             }
             .onAppear { scrollToBottom(proxy, animated: false) }
-            .onChange(of: model.messages.count) { _ in
+            .onChange(of: selectedMessages.count) { _ in
                 scrollToBottom(proxy, animated: true)
             }
             .onChange(of: model.selectedPeerID) { _ in
@@ -499,7 +654,7 @@ struct LANTransferView: View {
     }
 
     private func scrollToBottom(_ proxy: ScrollViewProxy, animated: Bool) {
-        guard let last = model.messages.last else { return }
+        guard let last = selectedMessages.last else { return }
         if animated {
             withAnimation(.easeOut(duration: 0.18)) {
                 proxy.scrollTo(last.id, anchor: .bottom)
@@ -514,10 +669,12 @@ struct LANTransferView: View {
             Image(systemName: "bubble.left.and.bubble.right")
                 .font(.system(size: 34, weight: .light))
                 .foregroundStyle(.tertiary)
-            Text("还没有消息")
+            Text(selectedPeer == nil ? "还没有消息" : "还没有和「\(selectedPeerDisplayName)」的消息")
                 .font(.title3.weight(.medium))
                 .foregroundStyle(.secondary)
-            Text("收到的文字和文件会像聊天一样显示在这里，\n发出去的内容也会留在上面。")
+            Text(selectedPeer == nil
+                 ? "在左侧选择设备后，各自的聊天记录会显示在这里。"
+                 : "收到的文字和文件会显示在这里，发出去的内容也会留在上面。\n切换到其他设备会看到它们各自的会话。")
                 .font(.callout)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
@@ -534,7 +691,8 @@ struct LANTransferView: View {
             if outgoing {
                 Spacer(minLength: 30)
             } else {
-                bubbleAvatar(systemName: "desktopcomputer", outgoing: false, peerName: message.peerName)
+                bubbleAvatar(systemName: "desktopcomputer", outgoing: false,
+                             peerName: selectedPeerDisplayName)
             }
 
             VStack(alignment: outgoing ? .trailing : .leading, spacing: 4) {
@@ -543,11 +701,11 @@ struct LANTransferView: View {
                         Text(message.date.formatted(date: .omitted, time: .shortened))
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
-                        Text("我 → \(message.peerName)")
+                        Text("我 → \(selectedPeerDisplayName)")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     } else {
-                        Text(message.peerName)
+                        Text(selectedPeerDisplayName)
                             .font(.caption2.weight(.medium))
                             .foregroundStyle(.secondary)
                         Text(message.date.formatted(date: .omitted, time: .shortened))
@@ -665,12 +823,34 @@ struct LANTransferView: View {
         VStack(alignment: .leading, spacing: 8) {
             if model.busy {
                 HStack(spacing: 8) {
-                    ProgressView(value: model.sendProgress)
-                        .controlSize(.small)
+                    if model.sendProgress > 0 {
+                        ProgressView(value: model.sendProgress)
+                            .controlSize(.small)
+                        Text("\(Int(model.sendProgress * 100))%")
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .frame(width: 34, alignment: .trailing)
+                    } else {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
                     Text("正在发送 \(model.activeSendLabel)…")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                    Spacer(minLength: 4)
+                    if model.canCancelSend {
+                        Button {
+                            model.cancelSend()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("取消发送")
+                        .accessibilityLabel("取消发送")
+                    }
                 }
                 .padding(.horizontal, 2)
             }
@@ -748,7 +928,7 @@ struct LANTransferView: View {
 
     private var composerPlaceholder: String {
         guard let peer = selectedPeer else { return "先在左侧选择设备" }
-        return "发送给 \(peer.name)…"
+        return "发送给 \(model.displayName(peer))…"
     }
 
     private var canSendText: Bool {
@@ -762,9 +942,9 @@ struct LANTransferView: View {
             return "未选择设备"
         }
         if selectedPeerPaired {
-            return "发给 \(peer.name) · 已配对"
+            return "发给 \(model.displayName(peer)) · 已配对"
         }
-        return "发给 \(peer.name) · 首次发送需输入对方配对码"
+        return "发给 \(model.displayName(peer)) · 首次发送需输入对方配对码"
     }
 
     private var stagedFileBar: some View {
