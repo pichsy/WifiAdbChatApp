@@ -274,58 +274,58 @@
           </StackPanel>
         </Border>
 
-        <!-- 本机：固定在左下角，不随上面的设备列表滚动 -->
+        <!-- 本机：固定在左下角，不随上面的设备列表滚动。
+             和 macOS 左侧一样压成三行——少占地方，设备列表就能多显示几台。 -->
         <Border Grid.Row="4" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,1,0,0"
-                Padding="12,10">
-          <StackPanel Spacing="6">
-            <TextBlock Text="本机" Classes="sectionTitle" Margin="0" />
-            <Border Background="{DynamicResource CardBrush}" CornerRadius="10" Padding="12"
-                    BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1">
-              <StackPanel Spacing="9">
-                <TextBlock Text="{Binding DeviceName}" FontSize="14" FontWeight="SemiBold"
-                           TextTrimming="CharacterEllipsis"
-                           Foreground="{DynamicResource TextPrimaryBrush}" />
+                Padding="12,8">
+          <StackPanel Spacing="5">
 
-                <StackPanel Spacing="2">
-                  <TextBlock Text="你的配对码" Classes="metaDim" />
-                  <Grid ColumnDefinitions="*,Auto">
-                    <TextBlock Text="{Binding PairingCodeDisplay}" Classes="pairingCode"
-                               VerticalAlignment="Center" />
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4"
-                                VerticalAlignment="Center">
-                      <Button Classes="link" Content="复制" Click="OnCopyPairingCode"
-                              ToolTip.Tip="复制配对码" />
-                      <Button Classes="link" Content="换一个" Click="OnRegenerateCode"
-                              ToolTip.Tip="换一个配对码" />
-                    </StackPanel>
-                  </Grid>
-                  <TextBlock Text="对方第一次连接你时输入这个码，输过一次会自动记住"
-                             Classes="metaDim" TextWrapping="Wrap" />
+            <!-- 本机 <名字>                       清除配对 -->
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
+              <TextBlock Text="本机" Classes="metaDim" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" Text="{Binding DeviceName}" FontSize="12.5"
+                         FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                         VerticalAlignment="Center"
+                         ToolTip.Tip="{Binding DeviceName}"
+                         Foreground="{DynamicResource TextPrimaryBrush}" />
+              <Button Grid.Column="2" Classes="link" Content="清除配对" FontSize="11"
+                      VerticalAlignment="Center"
+                      IsVisible="{Binding HasPaired}" Click="OnForgetAllPairs" />
+            </Grid>
+
+            <!-- 你的配对码  5 6 3 9 6 4        [复制] [换一个] -->
+            <StackPanel Spacing="0">
+              <TextBlock Text="你的配对码" Classes="metaDim" />
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="{Binding PairingCodeDisplay}" Classes="pairingCode"
+                           VerticalAlignment="Center"
+                           ToolTip.Tip="对方第一次连接你时输入这个码，输过一次会自动记住" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2"
+                            VerticalAlignment="Center">
+                  <Button Classes="icon" Content="📋" FontSize="10" Padding="4"
+                          Click="OnCopyPairingCode" ToolTip.Tip="复制配对码" />
+                  <Button Classes="icon" Content="↻" FontSize="12" Padding="4"
+                          Click="OnRegenerateCode" ToolTip.Tip="换一个配对码" />
                 </StackPanel>
+              </Grid>
+            </StackPanel>
 
-                <Border Height="1" Background="{DynamicResource DividerBrush}" />
-
-                <StackPanel Spacing="3">
-                  <TextBlock Text="接收目录" Classes="metaDim" />
-                  <Button Classes="link" Click="OnOpenReceiveDir" HorizontalAlignment="Stretch"
-                          HorizontalContentAlignment="Left" Padding="4,2"
-                          ToolTip.Tip="{Binding ReceiveDir}">
-                    <TextBlock Text="{Binding ReceiveDir}" TextWrapping="Wrap" FontSize="11.5" />
-                  </Button>
-                  <Button Classes="link" Content="修改接收目录…" HorizontalAlignment="Left"
-                          Click="OnChangeReceiveDir" />
-                </StackPanel>
-
-                <Border Height="1" Background="{DynamicResource DividerBrush}" />
-
-                <Grid ColumnDefinitions="*,Auto">
-                  <TextBlock Text="{Binding PairedSummary}" Classes="metaDim"
-                             VerticalAlignment="Center" />
-                  <Button Grid.Column="1" Classes="link" Content="清除配对"
-                          IsVisible="{Binding HasPaired}" Click="OnForgetAllPairs" />
-                </Grid>
-              </StackPanel>
-            </Border>
+            <!-- 📁 接收目录…           修改  [打开] -->
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="5">
+              <TextBlock Text="📁" FontSize="11" VerticalAlignment="Center" Opacity="0.75" />
+              <Button Grid.Column="1" Classes="link" Padding="0" FontSize="11.5"
+                      HorizontalAlignment="Left" Click="OnOpenReceiveDir"
+                      ToolTip.Tip="{Binding ReceiveDir}">
+                <TextBlock Text="{Binding ReceiveDir}" TextTrimming="CharacterEllipsis"
+                           FontSize="11.5" MaxWidth="150" />
+              </Button>
+              <Button Grid.Column="2" Classes="link" Content="修改" FontSize="11"
+                      VerticalAlignment="Center" Click="OnChangeReceiveDir"
+                      ToolTip.Tip="修改接收目录" />
+              <Button Grid.Column="3" Classes="icon" Content="📂" FontSize="11" Padding="4"
+                      VerticalAlignment="Center" Click="OnOpenReceiveDir"
+                      ToolTip.Tip="在文件管理器中打开接收目录" />
+            </Grid>
           </StackPanel>
         </Border>
 
