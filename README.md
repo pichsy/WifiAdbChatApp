@@ -81,9 +81,16 @@ powershell -ExecutionPolicy Bypass -File windows\build.ps1
 - macOS 联调工具（探针 / Python 对端 / 互通脚本）：[`macos/tests/README.md`](macos/tests/README.md)
 - 移动端规划：[`mobile/README.md`](mobile/README.md)
 
-## 安装包
+## 下载与安装包
 
-macOS 的 dmg / zip 由 `macos/package.sh` 生成在 `macos/dist/`（构建产物，不进 git）。
+**macOS 直接下载**：[`release/文件互传助手-1.6.dmg`](release/文件互传助手-1.6.dmg)
+（3.4 MB，macOS 13+，Apple 芯片 / Intel 通用）
+
+- 双击 dmg，把「文件互传助手.app」拖进「应用程序」覆盖旧版即可；
+- 未签名 / 未公证，首次打开如被拦：右键「打开」，或执行 dmg 里的 `授权并安装.sh`；
+- 历史版本与 SHA-256 见 [`release/README.md`](release/README.md)。
+
+构建产物仍由 `macos/package.sh` 生成在 `macos/dist/`（不进 git）；正式发布包放在 `release/`。
 Windows 的自包含 exe 由 `windows/build.ps1` 生成在 `windows/publish/`（同样不进 git）。
 
 ## 已知限制
