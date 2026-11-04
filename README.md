@@ -64,7 +64,7 @@
 | --- | --- |
 | ![Windows 电脑设备](docs/screenshots/win-pc.jpg) | ![Windows 移动设备](docs/screenshots/win-home.jpg) |
 
-Windows 端同样会保留离线好友，并在状态栏显示「连接中断，正在重连…」。
+Windows 端同样会保留离线好友，并在状态栏显示「连接中断，正在重连…」：[离线好友截图](docs/screenshots/win-pc2.jpg)。
 
 ## 核心技术与亮点
 

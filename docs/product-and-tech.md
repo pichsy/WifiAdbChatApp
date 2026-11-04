@@ -49,7 +49,9 @@ Windows 端使用 .NET 8 + Avalonia，界面与 macOS 端保持同一套交互�
 
 ![Windows 移动设备页](screenshots/win-home.jpg)
 
-离线好友仍然保留在列表里，显示「连接中断，正在重连…」，连接状态与历史记录互不影响。
+离线好友仍然保留在列表里，显示「连接中断，正在重连…」，连接状态与历史记录互不影响：
+
+![Windows 离线好友与重连](screenshots/win-pc2.jpg)
 
 ## 3. 功能全景
 

@@ -13,6 +13,10 @@ Windows 端的「文件互传助手」局域网传输应用：和 macOS 端（`m
 
 ![Windows 移动设备页](../docs/screenshots/win-home.jpg)
 
+离线好友仍保留，连接状态单独显示：
+
+![Windows 离线好友与重连](../docs/screenshots/win-pc2.jpg)
+
 ---
 
 ## 1. 目录结构
