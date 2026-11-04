@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 用 Material3 主题作为窗口主题：filepicker 的图片/视频预览弹窗会加载
+         AppCompat/Material 控件，需要有 Material 主题上下文。 -->
+    <style name="Theme.AdbTypeMobile" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">#FFF6F8FB</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

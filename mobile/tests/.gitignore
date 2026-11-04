@@ -1,0 +1,6 @@
+# 运行时生成物（参考对端的身份/配对状态、接收目录、Python 缓存）
+__pycache__/
+*.py[cod]
+.state/
+received/
+.DS_Store

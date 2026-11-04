@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 公共下载目录里的接收文件（API 28 用文件路径保存时，打开/分享走 FileProvider） -->
+    <external-path name="public_downloads" path="Download/文件互传助手/" />
+    <!-- API 28 未授予存储权限时的接收兜底目录（App 外部私有目录） -->
+    <external-files-path name="received_external" path="received/" />
+    <files-path name="received_internal" path="received/" />
+    <!-- 发送前复制到 App 私有目录的副本 -->
+    <files-path name="outgoing" path="outgoing/" />
+    <cache-path name="cache" path="." />
+</paths>

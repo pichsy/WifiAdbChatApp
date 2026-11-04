@@ -211,6 +211,20 @@ Windows 端使用 .NET 8 + Avalonia，界面与 macOS 端保持同一套交互�
   桌面快捷方式、卸载；自包含发布，目标机不需要安装 .NET；
 - 在 macOS 上即可完成 Windows 端编译、冒烟测试和双端联调。
 
+### 4.11 移动端：只做电脑互传
+
+- Android：Kotlin + Jetpack Compose，minSdk 28；iOS：Swift + SwiftUI，iOS 17+；两端复用同一套
+  UDP 发现 / TCP 帧 / 6 位配对 / 每设备会话缓存。
+- 不做 ADB、USB 调试、手机输入；只和电脑端 / 另一台手机互传文字与文件。
+- **接收文件放用户可访问位置**：Android 公共 `Download/文件互传助手/`（MediaStore content URI）；
+  iOS `Documents/Downloads/`（「文件」App 可见）并把图片 / 视频额外存入系统相册。
+- 图片 / 视频消息显示 120×90 固定缩略图：Android 用 Glide + MediaMetadataRetriever，点击用
+  filepicker 的 `ImagePreviewDialog` / `VideoPreviewDialog`；iOS 用 ImageIO / AVAssetImageGenerator，
+  全屏缩放与 AVKit 播放。
+- 真机实测：HUAWEI BRE-AL80（Android 12）↔ 真实 Mac / iPhone 17 模拟器文字双向；
+  Android ↔ Mac 文件双向、iOS ↔ Mac 图片 / 视频文件与落盘校验。
+- 详细构建、存储位置、测试结果见 [`mobile/README.md`](../mobile/README.md)。
+
 ## 5. 实测数据
 
 | 场景 | 结果 |
@@ -238,6 +252,8 @@ Windows 端使用 .NET 8 + Avalonia，界面与 macOS 端保持同一套交互�
 | --- | --- |
 | macOS | Swift / SwiftUI / AppKit，无第三方依赖，通用二进制 |
 | Windows | C# / .NET 8 / Avalonia 11.3.22，NSIS 安装包 |
+| Android | Kotlin / Jetpack Compose / MediaStore / filepicker，minSdk 28 |
+| iOS | Swift / SwiftUI / AVKit / Photos，iOS 17+ |
 | 协议 | UDP 发现 + TCP 长度前缀 JSON 帧 + 原始文件流 |
 | 持久化 | 本地 JSON（paired / friends / chats / 迁移归档） |
 | 手机侧 | Android adb、内置剪贴板 dex |

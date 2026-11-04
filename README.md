@@ -33,7 +33,7 @@
 │  ├─ build-release.ps1   生成 release/ 下的安装包
 │  └─ README.md           构建、使用、防火墙说明
 ├─ release/               正式发布包（macOS dmg + Windows 安装包）
-├─ mobile/                移动端（规划中，只有 README）
+├─ mobile/                移动端（Android / iOS 原生 App，只做电脑互传）
 ├─ docs/
 │  ├─ product-and-tech.md    产品能力、核心技术与实测数据
 │  ├─ LAN-transfer-spec.md   三端共用的协议 + 界面规格
@@ -48,7 +48,8 @@
 | --- | --- | --- |
 | macOS | ✅ 可运行 | 手机输入 / 手机文件传输 / 电脑聊天互传；已配对好友列表 + 别名 + 每设备独立会话 + 自动/手动重连 + 发送进度/取消 + 消息右键菜单/文件缺失删除线/关闭按钮最小化；已打包 2.0.1（dmg + zip） |
 | Windows | ✅ 代码完成，安装包可用 | macOS 上编译 0 warning、冒烟测试 37/37 + 9/9、与 macOS 端双向真实收发通过；Windows 真机上安装 / 桌面快捷方式 / 卸载已验证；关闭窗口收进托盘，后台继续收发 |
-| Mobile | 📝 规划中 | 协议与一期范围见 [`mobile/README.md`](mobile/README.md) |
+| Android | ✅ 原生已实现 | Kotlin + Compose，minSdk 28；只做电脑互传；公开 Downloads 落盘 + 图片/视频缩略图/filepicker 预览；HUAWEI 真机联调通过 |
+| iOS | ✅ 原生已实现 | SwiftUI，iOS 17+；只做电脑互传；Documents/Downloads + 系统相册；缩略图/AVKit 播放；iPhone 17 模拟器 49 tests + UI 测试通过（真机需签名） |
 
 ## 界面预览
 
@@ -66,6 +67,16 @@
 
 Windows 端同样会保留离线好友，并在状态栏显示「连接中断，正在重连…」：[离线好友截图](docs/screenshots/win-pc2.jpg)。
 
+**Android / iOS**
+
+| Android 首页 | Android 聊天（缩略图） |
+| --- | --- |
+| ![Android 首页](docs/screenshots/android-home.png) | ![Android 聊天](docs/screenshots/android-chat-media.png) |
+
+| iOS 首页 | iOS 聊天（缩略图） |
+| --- | --- |
+| ![iOS 首页](docs/screenshots/ios-home.png) | ![iOS 聊天](docs/screenshots/ios-chat-media.png) |
+
 ## 核心技术与亮点
 
 - **零服务器直连**：UDP 52730 自动发现，TCP 随机端口直接传文件；不登录、不上传云端、不需要公网。
@@ -73,7 +84,8 @@ Windows 端同样会保留离线好友，并在状态栏显示「连接中断，
 - **断线自愈**：2 秒心跳 + 已知设备单播 + 自动重连；设备掉线先标「离线 · 正在重连」，好友列表和聊天记录不消失；网络切换 / 睡眠唤醒自动恢复。
 - **每设备独立会话**：按设备 ID 存 `chats/<设备ID>.json`，选中谁只显示谁；离线、重启后历史仍在；旧版单文件记录自动合并迁移。
 - **文件传输可控**：进度百分比、X 取消、失败清理半截文件、重名自动编号；文件丢失显示删除线，右键可打开接收目录。
-- **双端原生**：macOS 用 SwiftUI + AppKit 通用二进制；Windows 用 .NET 8 + Avalonia 自包含安装包；同协议、同缓存格式，可混用。
+- **三端原生**：macOS 用 SwiftUI + AppKit 通用二进制；Windows 用 .NET 8 + Avalonia 自包含安装包；Android 用 Kotlin + Compose；iOS 用 SwiftUI + AVKit；同协议、同缓存格式，可混用。
+- **移动端存储与预览**：Android 接收文件落公共 `Download/文件互传助手/`；iOS 落「文件」App 可见的 `Documents/Downloads/` 并支持存入相册；图片/视频 120×90 缩略图，点击放大 / 播放（Android 使用 filepicker 弹窗）。
 - **手机直达**：USB ADB 注入中文 / ASCII 文字，文件直接推进 `/sdcard/Download`。
 
 完整架构、核心技术和实测数据：[docs/product-and-tech.md](docs/product-and-tech.md)。
@@ -99,7 +111,14 @@ release\文件互传助手-2.0.1-安装包.exe
 安装向导最后一页默认勾选「创建桌面快捷方式」，完成后桌面 / 开始菜单即可启动。
 从源码构建 / 重新打包见 [`windows/README.md`](windows/README.md)。
 
-**移动端**：见 [`mobile/README.md`](mobile/README.md)（暂未实现）。
+**Android / iOS**
+
+```bash
+cd mobile/android && ./gradlew assembleDebug   # APK: app/build/outputs/apk/debug/app-debug.apk
+cd mobile/ios && xcodegen generate             # 然后用 Xcode / xcodebuild 构建
+```
+
+详细依赖、权限、模拟器/真机步骤见 [`mobile/README.md`](mobile/README.md)。
 
 ## 文档
 
@@ -109,7 +128,8 @@ release\文件互传助手-2.0.1-安装包.exe
 - Windows 端构建、使用、防火墙：[`windows/README.md`](windows/README.md)
 - Windows 真机测试清单：[`windows/TESTING.md`](windows/TESTING.md)
 - macOS 联调工具（探针 / Python 对端 / 互通脚本）：[`macos/tests/README.md`](macos/tests/README.md)
-- 移动端规划：[`mobile/README.md`](mobile/README.md)
+- Android / iOS 原生 App：[`mobile/README.md`](mobile/README.md)
+- 协议参考对端 / 回归测试：[`mobile/tests/README.md`](mobile/tests/README.md)
 
 ## 下载与安装包
 

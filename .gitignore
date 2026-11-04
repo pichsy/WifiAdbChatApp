@@ -18,3 +18,23 @@ windows/dist/
 # 本机测试脚本与截图（生成物）
 /windows/artifacts/
 /windows/screenshots/
+
+# Android 构建产物 / 本机配置
+mobile/android/.gradle/
+mobile/android/**/build/
+mobile/android/local.properties
+mobile/android/.idea/
+mobile/android/*.iml
+mobile/android/.kotlin/
+
+# iOS 构建产物 / Xcode 用户数据
+mobile/ios/build/
+mobile/ios/DerivedData/
+mobile/ios/.build/
+mobile/ios/**/*.xcuserstate
+mobile/ios/**/xcuserdata/
+mobile/ios/*.xcodeproj/xcuserdata/
+mobile/ios/*.xcworkspace/xcuserdata/
+
+# Python 测试缓存
+mobile/tests/__pycache__/
