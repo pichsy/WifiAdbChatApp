@@ -8,11 +8,13 @@ macOS 原生 SwiftUI 小工具（macOS 13+，无第三方依赖），包含两�
 Windows 端在 [`windows/`](../windows/)；移动端规划见 [`mobile/`](../mobile/)；
 局域网协议见 [`docs/LAN-transfer-spec.md`](../docs/LAN-transfer-spec.md)。
 
-界面预览（深色 / 浅色）：
+界面预览：
 
-![macOS 电脑设备页深色](../docs/screenshots/macos-chat-dark.png)
+![macOS 电脑设备页](../docs/screenshots/macos-computer-dark.jpg)
 
-![macOS 电脑设备页浅色](../docs/screenshots/macos-chat-light.png)
+![macOS 移动设备页](../docs/screenshots/macos-mobile-dark.jpg)
+
+完整产品能力与核心技术见 [`docs/product-and-tech.md`](../docs/product-and-tech.md)。
 
 ---
 

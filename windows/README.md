@@ -7,11 +7,11 @@ Windows 端的「文件互传助手」局域网传输应用：和 macOS 端（`m
 - 纯 .NET 8（`net8.0`）+ Avalonia 11.3.22，不依赖 WinForms/WPF，核心库可在 macOS/Linux 上编译和测试。
 - 无需账号、无服务器、不加密（明文 TCP，仅限可信局域网）。
 
-界面预览（深色 / 浅色）：
+界面预览：
 
-![Windows 端深色](../docs/screenshots/windows-chat-dark.png)
+![Windows 电脑设备页](../docs/screenshots/win-pc.jpg)
 
-![Windows 端浅色](../docs/screenshots/windows-chat-light.png)
+![Windows 移动设备页](../docs/screenshots/win-home.jpg)
 
 ---
 
