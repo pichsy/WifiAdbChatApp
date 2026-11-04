@@ -7,10 +7,9 @@
 | macOS | 2.1.0 | [文件互传助手-2.1.0.dmg](文件互传助手-2.1.0.dmg) | 3.4 MB | `cdc924a929f12ddf4c5e5b7a41edf4c4e8bd2eb0a01cc98aa06ad99632eb549c` |
 | Android | 2.1.0 | [文件互传助手-Android-2.1.0.apk](文件互传助手-Android-2.1.0.apk) | 42 MB | `a36f221f682a52f589594b54b532904e1857523cfd8e24e6476df380b79505f0` |
 | iOS | 2.1.0 | [文件互传助手-iOS-2.1.0.ipa](文件互传助手-iOS-2.1.0.ipa) | 2.2 MB | `f05e37d5a3c324f8c3139ec09bbff0bd1cbe7889fd6d4115f9bb4f09d2bd3bf7` |
-| Windows | 2.0.1 | [文件互传助手-2.0.1-安装包.exe](文件互传助手-2.0.1-安装包.exe) | 28.1 MB | `99843f97159a3ab7c19321723a87a226ad35ec3676223c44d7fdee3e2a180d28` |
+| Windows | 2.1.0 | [文件互传助手-2.1.0-安装包.exe](文件互传助手-2.1.0-安装包.exe) | 28.1 MB | `a6ea8ae0e4bbf0c7e6b5905d52332ce2ba8bac83736d0ef5dfbd23654f10570c` |
 
-> macOS / Android / iOS 本轮统一为 **2.1.0**，Windows 源码已同步到 2.1.0；当前 Windows 安装包仍是 2.0.1，
-> 需要重新运行 `windows/build-release.ps1` 才会产出 `文件互传助手-2.1.0-安装包.exe`。
+> 四端本轮统一为 **2.1.0**（macOS / Android / iOS / Windows）。
 > **iOS ipa 未签名**，需要用自己的 Apple Developer Team 重签后才能装真机；
 > **Android apk 为 debug 签名**，可直接侧载安装。Windows 安装包由
 > `windows/build-release.ps1` 生成（内置 .NET 8 运行时，目标机器无需安装 .NET）。
@@ -45,7 +44,7 @@
 
 ## Windows 安装
 
-1. 双击 `文件互传助手-2.0.1-安装包.exe`。
+1. 双击 `文件互传助手-2.1.0-安装包.exe`。
 2. 按向导走完：欢迎页 → 选择安装位置（默认 `D:\Program Files\文件互传助手`，向导里可以改成任意目录）→ 安装。
    主程序、3 个原生库、图标和卸载程序都会放进这个目录，运行时直接从该目录启动，
    不会再把程序文件解压到 `C:\...\Temp`。
@@ -65,6 +64,6 @@
 - macOS / Windows / iOS 均未做正式签名 / 公证；Android 为 debug 签名。首次打开可能被
   Gatekeeper / SmartScreen / 系统安全提示拦截，按上面的说明放行或重新签名。
 - 更新内容见根目录 [README](../README.md) 和各端 README 的更新记录。
-- Windows 2.0.1：点右上角 ✕ 不再退出，窗口收进**托盘**后台继续收发；
+- Windows 2.1.0：点右上角 ✕ 不再退出，窗口收进**托盘**后台继续收发；
   左键托盘图标恢复窗口，右键托盘图标可「显示主窗口 / 退出文件互传助手」。
 - `release/` 只存正式发布的安装包；macOS `macos/dist/`、Windows `windows/publish/` 等中间产物都不进 git。

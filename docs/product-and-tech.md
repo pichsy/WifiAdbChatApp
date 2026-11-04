@@ -274,7 +274,7 @@ Windows 端使用 .NET 8 + Avalonia，界面与 macOS 端保持同一套交互�
   （Android 8.0+，debug 签名）
 - iOS：[`release/文件互传助手-iOS-2.1.0.ipa`](../release/文件互传助手-iOS-2.1.0.ipa)
   （iOS 17+，未签名，需自行重签）
-- Windows：[`release/文件互传助手-2.0.1-安装包.exe`](../release/文件互传助手-2.0.1-安装包.exe)
+- Windows：[`release/文件互传助手-2.1.0-安装包.exe`](../release/文件互传助手-2.1.0-安装包.exe)
   （Windows 10 1809+ / 11 x64，自包含 .NET 运行时）
 - 校验值：[`release/SHA256SUMS.txt`](../release/SHA256SUMS.txt)
 
