@@ -4,21 +4,43 @@
 
 | 平台 | 版本 | 文件 | 大小 | SHA-256 |
 | --- | --- | --- | --- | --- |
-| macOS | 2.0.1 | [文件互传助手-2.0.1.dmg](文件互传助手-2.0.1.dmg) | 3.4 MB | `115f3d52775a0ae3456e210f6dc3f02312eff2ae559355f17ff67f74ed6c44fd` |
+| macOS | 2.1.0 | [文件互传助手-2.1.0.dmg](文件互传助手-2.1.0.dmg) | 3.4 MB | `cdc924a929f12ddf4c5e5b7a41edf4c4e8bd2eb0a01cc98aa06ad99632eb549c` |
+| Android | 2.1.0 | [文件互传助手-Android-2.1.0.apk](文件互传助手-Android-2.1.0.apk) | 42 MB | `a36f221f682a52f589594b54b532904e1857523cfd8e24e6476df380b79505f0` |
+| iOS | 2.1.0 | [文件互传助手-iOS-2.1.0.ipa](文件互传助手-iOS-2.1.0.ipa) | 2.2 MB | `f05e37d5a3c324f8c3139ec09bbff0bd1cbe7889fd6d4115f9bb4f09d2bd3bf7` |
 | Windows | 2.0.1 | [文件互传助手-2.0.1-安装包.exe](文件互传助手-2.0.1-安装包.exe) | 28.1 MB | `99843f97159a3ab7c19321723a87a226ad35ec3676223c44d7fdee3e2a180d28` |
 
-> macOS 2.0.1、Windows 2.0.1 为当前最新发布。Windows 安装包由
+> macOS / Android / iOS 本轮统一为 **2.1.0**；Windows 仍是 2.0.1（下一轮同步）。
+> **iOS ipa 未签名**，需要用自己的 Apple Developer Team 重签后才能装真机；
+> **Android apk 为 debug 签名**，可直接侧载安装。Windows 安装包由
 > `windows/build-release.ps1` 生成（内置 .NET 8 运行时，目标机器无需安装 .NET）。
 > 校验值也可在 [SHA256SUMS.txt](SHA256SUMS.txt) 里查到。
 
 ## macOS 安装
 
 1. 下载 dmg 后双击挂载。
-2. 把「文件互传助手.app」拖进「应用程序」；如果之前装过旧版，选择**替换**（旧版的
-   1.2 不包含好友列表/独立会话，建议直接覆盖）。
+2. 把「文件互传助手.app」拖进「应用程序」；如果之前装过旧版，选择**替换**。
 3. 首次打开如果被 Gatekeeper 拦截：右键 App →「打开」；或执行 dmg 里的
    `授权并安装.sh`；macOS 15+ 也可以在「系统设置 → 隐私与安全性」点「仍要打开」。
 4. 第一次使用「电脑设备」页时，按提示允许**本地网络**权限。
+
+## Android 安装
+
+1. 下载 `文件互传助手-Android-2.1.0.apk`。
+2. 用 USB 线安装：`adb install -r 文件互传助手-Android-2.1.0.apk`；或把 APK 传到手机，
+   在文件管理器里打开并允许「安装未知应用」。
+3. 首次打开需要允许「本地网络 / 附近设备」相关权限；收到的文件保存在
+   `Download/文件互传助手/`，可在系统「文件管理 → 下载」里直接看到。
+
+> APK 是 debug 签名，仅用于测试分发；正式上架 Google Play 需要换成自己的 release keystore。
+
+## iOS 安装
+
+1. 下载 `文件互传助手-iOS-2.1.0.ipa`。
+2. **该 IPA 未签名，不能直接双击安装**。需要用自己的 Apple Developer Team 重签：
+   在 Xcode 里打开 `mobile/ios/ADBTypeMobile.xcodeproj`，选择 Team 后 Archive / 导出 IPA；
+   或用 `codesign` + 自己的 provisioning profile 重签。
+3. 首次运行需允许「本地网络」；收到的文件在「文件」App › 我的 iPhone › 文件互传助手 ›
+   Downloads，图片 / 视频还会额外存入系统相册（首次会询问「仅添加照片」）。
 
 ## Windows 安装
 
@@ -37,8 +59,10 @@
 
 ## 说明
 
-- macOS 支持 macOS 13+，通用二进制（Apple 芯片 / Intel）；Windows 支持 Windows 10 1809+ / 11 x64。
-- 两端都未做代码签名 / 公证，首次打开可能被 Gatekeeper / SmartScreen 拦截，按上面的说明放行即可。
+- macOS 支持 macOS 13+，通用二进制（Apple 芯片 / Intel）；Android 支持 Android 8.0+（API 28），
+  iOS 支持 iOS 17+；Windows 支持 Windows 10 1809+ / 11 x64。
+- macOS / Windows / iOS 均未做正式签名 / 公证；Android 为 debug 签名。首次打开可能被
+  Gatekeeper / SmartScreen / 系统安全提示拦截，按上面的说明放行或重新签名。
 - 更新内容见根目录 [README](../README.md) 和各端 README 的更新记录。
 - Windows 2.0.1：点右上角 ✕ 不再退出，窗口收进**托盘**后台继续收发；
   左键托盘图标恢复窗口，右键托盘图标可「显示主窗口 / 退出文件互传助手」。

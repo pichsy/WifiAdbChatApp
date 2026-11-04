@@ -98,7 +98,7 @@ open 文件互传助手.app
 
 ```bash
 cd macos
-./package.sh        # 生成 macos/dist/文件互传助手-2.0.1.dmg 和 macos/dist/文件互传助手-2.0.1-macOS.zip
+./package.sh        # 生成 macos/dist/文件互传助手-2.1.0.dmg 和 macos/dist/文件互传助手-2.1.0-macOS.zip
 ```
 
 - dmg / zip 里带《安装说明.txt》和「授权并安装.sh」（可执行 shell 脚本）：在终端执行
@@ -163,6 +163,8 @@ adb -s <serial> shell input keyevent 66              # 回车
 
 ## 更新记录
 
+- **2.1.0**：三端版本号统一（macOS / Android / iOS）；本版 macOS 功能与 2.0.1 一致，
+  仅版本号与发布包更新。
 - **2.0.1**：窗口红色关闭按钮改为「最小化到 Dock」，不再关掉窗口/退出进程；点 Dock 图标或
   重新打开 App 会还原窗口。真正退出仍需 ⌘Q 或 Dock 菜单「退出」。
 - **2.0.0**：macOS 端大版本更新：已配对好友列表与本地别名、每设备独立会话缓存、离线保留、

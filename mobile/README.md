@@ -3,6 +3,9 @@
 > 已实现：Android（Kotlin + Jetpack Compose，minSdk 28）与 iOS（SwiftUI，iOS 17+）原生 App。
 > 只做「电脑设备」功能：和同一 Wi-Fi 下的 macOS / Windows 电脑发现、配对、互发文字和文件；
 > 不做 ADB、USB 调试、手机输入、移动设备页。
+>
+> 当前版本：**2.1.0**（Android / iOS）。发布包见仓库 [`release/`](../release/)：
+> `文件互传助手-Android-2.1.0.apk`（debug 签名）、`文件互传助手-iOS-2.1.0.ipa`（未签名，需自行重签）。
 
 ## 截图
 
