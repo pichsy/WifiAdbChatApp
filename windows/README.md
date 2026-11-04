@@ -81,7 +81,7 @@ powershell -ExecutionPolicy Bypass -File .\build-release.ps1
 （`ADBTypeLink.App.exe` + `libSkiaSharp.dll` / `av_libglesv2.dll` / `libHarfBuzzSharp.dll`，
 原生库随程序放在安装目录，运行时不再解压到 `C:\...\Temp`），再用 NSIS 编译安装程序到仓库根目录：
 
-- `release\文件互传助手-2.0.1-安装包.exe`：带安装向导，安装位置由向导里选择
+- `release\文件互传助手-2.1.0-安装包.exe`：带安装向导，安装位置由向导里选择
   （默认 `D:\Program Files\文件互传助手`，向导里随时可以改），
   **完成页有「创建桌面快捷方式」勾选项、默认勾选，点「完成」时才创建**；同时创建开始菜单项和「设置 → 应用」卸载项；
 - 只重打安装包（复用现有 exe）：`-SkipBuild`；

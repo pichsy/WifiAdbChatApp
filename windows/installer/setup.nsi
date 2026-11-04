@@ -20,8 +20,8 @@ ManifestDPIAware true
 !include "FileFunc.nsh"
 
 !define APP_NAME      "文件互传助手"
-!define APP_VERSION   "2.0.1"
-!define APP_VER4      "2.0.1.0"
+!define APP_VERSION   "2.1.0"
+!define APP_VER4      "2.1.0.0"
 !define APP_EXE       "ADBTypeLink.App.exe"
 !define APP_KEY       "WifiAdbChatApp"
 !define APP_UNINST    "Software\Microsoft\Windows\CurrentVersion\Uninstall\WifiAdbChatApp"

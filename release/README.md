@@ -9,7 +9,8 @@
 | iOS | 2.1.0 | [文件互传助手-iOS-2.1.0.ipa](文件互传助手-iOS-2.1.0.ipa) | 2.2 MB | `f05e37d5a3c324f8c3139ec09bbff0bd1cbe7889fd6d4115f9bb4f09d2bd3bf7` |
 | Windows | 2.0.1 | [文件互传助手-2.0.1-安装包.exe](文件互传助手-2.0.1-安装包.exe) | 28.1 MB | `99843f97159a3ab7c19321723a87a226ad35ec3676223c44d7fdee3e2a180d28` |
 
-> macOS / Android / iOS 本轮统一为 **2.1.0**；Windows 仍是 2.0.1（下一轮同步）。
+> macOS / Android / iOS 本轮统一为 **2.1.0**，Windows 源码已同步到 2.1.0；当前 Windows 安装包仍是 2.0.1，
+> 需要重新运行 `windows/build-release.ps1` 才会产出 `文件互传助手-2.1.0-安装包.exe`。
 > **iOS ipa 未签名**，需要用自己的 Apple Developer Team 重签后才能装真机；
 > **Android apk 为 debug 签名**，可直接侧载安装。Windows 安装包由
 > `windows/build-release.ps1` 生成（内置 .NET 8 运行时，目标机器无需安装 .NET）。
