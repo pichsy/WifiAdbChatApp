@@ -73,11 +73,12 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1
 powershell -ExecutionPolicy Bypass -File .\build-release.ps1
 ```
 
-脚本先 `dotnet publish` 出 `publish\release-build\ADBTypeLink.App.exe`（自包含单文件），
-再用 NSIS 编译安装程序到仓库根目录：
+脚本先 `dotnet publish` 出 `publish\release-build\` 下的自包含程序
+（`ADBTypeLink.App.exe` + `libSkiaSharp.dll` / `av_libglesv2.dll` / `libHarfBuzzSharp.dll`，
+原生库随程序放在安装目录，运行时不再解压到 `C:\...\Temp`），再用 NSIS 编译安装程序到仓库根目录：
 
-- `release\文件互传助手-1.2.0-安装包.exe`：带安装向导，按当前用户安装到
-  `%LOCALAPPDATA%\Programs\文件互传助手`（不需要管理员权限），
+- `release\文件互传助手-2.0.0-安装包.exe`：带安装向导，安装位置由向导里选择
+  （默认 `%LOCALAPPDATA%\Programs\文件互传助手`，不需要管理员权限），
   **完成页默认勾选「创建桌面快捷方式」**，同时创建开始菜单项和「设置 → 应用」卸载项；
 - 只重打安装包（复用现有 exe）：`-SkipBuild`；
 - 自定义工具路径：`-Dotnet <dotnet.exe> -Makensis <makensis.exe>`。

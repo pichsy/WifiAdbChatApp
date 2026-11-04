@@ -1,2 +1,2 @@
 f32bab947df849c949dab9b0e9ad58bb4bff34af69046fca227ac2bb2bacc730  文件互传助手-2.0.0.dmg
-5b6a8dc56a6db89cb171ecc8dceac6562c639d6a83dd0b35c05ec3bca68664f1  文件互传助手-1.2.0-安装包.exe
+cf48d2846d852298aeb0a87731dc63080728c737f2c11d8f542c9b095a7adf12  文件互传助手-2.0.0-安装包.exe

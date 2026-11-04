@@ -3,7 +3,7 @@
 ; 构建方式（脚本用 __FILEDIR__ 定位仓库根目录，必须传本文件的绝对路径）：
 ;   makensis /INPUTCHARSET UTF8 <本文件的绝对路径>
 ; 依赖：
-;   1) 已发布的 windows\publish\release-build\ADBTypeLink.App.exe（自包含单文件）
+;   1) 已发布的 windows\publish\release-build\ 目录（自包含 .NET 运行时：主程序 + 原生库）
 ;   2) NSIS 3.x（Unicode 版，含 Modern UI 2 与 nsDialogs）
 ; 产物：
 ;   release\文件互传助手-<版本>-安装包.exe
@@ -20,14 +20,15 @@ ManifestDPIAware true
 !include "FileFunc.nsh"
 
 !define APP_NAME      "文件互传助手"
-!define APP_VERSION   "1.2.0"
-!define APP_VER4      "1.2.0.0"
+!define APP_VERSION   "2.0.0"
+!define APP_VER4      "2.0.0.0"
 !define APP_EXE       "ADBTypeLink.App.exe"
 !define APP_KEY       "WifiAdbChatApp"
 !define APP_UNINST    "Software\Microsoft\Windows\CurrentVersion\Uninstall\WifiAdbChatApp"
 
 !define REPO_ROOT     "${__FILEDIR__}\..\.."
-!define SRC_EXE       "${REPO_ROOT}\windows\publish\release-build\ADBTypeLink.App.exe"
+!define SRC_DIR       "${REPO_ROOT}\windows\publish\release-build"
+!define SRC_EXE       "${SRC_DIR}\ADBTypeLink.App.exe"
 !define SRC_ICON      "${REPO_ROOT}\windows\src\ADBTypeLink.App\Assets\app.ico"
 
 Name "${APP_NAME}"
@@ -49,7 +50,7 @@ VIAddVersionKey /LANG=2052 "LegalCopyright"   "Copyright (c) ${APP_NAME}"
 !define MUI_WELCOMEPAGE_TITLE "欢迎安装 ${APP_NAME}"
 !define MUI_WELCOMEPAGE_TEXT "本向导将引导你完成 ${APP_NAME} ${APP_VERSION} 的安装。$\r$\n$\r$\n${APP_NAME} 用于在局域网内把文字和文件直接传到手机，或在电脑之间像聊天一样互传，数据不经过任何服务器。$\r$\n$\r$\n点击「下一步」继续。"
 !insertmacro MUI_PAGE_WELCOME
-!define MUI_DIRECTORYPAGE_TEXT_TOP "请选择 ${APP_NAME} 的安装位置。点击「安装」开始复制文件。"
+!define MUI_DIRECTORYPAGE_TEXT_TOP "请选择 ${APP_NAME} 的安装位置，安装文件会全部放到这个目录里。"
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !define MUI_FINISHPAGE_TITLE "安装完成"
@@ -136,7 +137,7 @@ FunctionEnd
 Section "主程序" SecMain
   SectionIn RO
   SetOutPath "$INSTDIR"
-  File "${SRC_EXE}"
+  File /r "${SRC_DIR}\*.*"
   File "/oname=app.ico" "${SRC_ICON}"
   WriteUninstaller "$INSTDIR\uninst.exe"
 
@@ -174,6 +175,7 @@ Section "Uninstall"
   RMDir  "$SMPROGRAMS\${APP_NAME}"
 
   Delete "$INSTDIR\${APP_EXE}"
+  Delete "$INSTDIR\*.dll"
   Delete "$INSTDIR\app.ico"
   Delete "$INSTDIR\uninst.exe"
   RMDir  "$INSTDIR"
