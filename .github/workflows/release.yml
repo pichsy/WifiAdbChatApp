@@ -1,0 +1,28 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: 文件互传助手 ${{ github.ref_name }}
+          body_path: docs/release-notes-2.0.1.md
+          files: |
+            release/文件互传助手-2.0.1.dmg
+            release/文件互传助手-2.0.1-安装包.exe
+            release/SHA256SUMS.txt
+            release/安装说明.md
+          fail_on_unmatched_files: true
