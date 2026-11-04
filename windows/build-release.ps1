@@ -7,8 +7,8 @@
        原生库不塞进 exe：主程序 + 3 个原生库一起发布，程序直接从安装目录运行，
        不再把文件解压到 C:\Users\...\AppData\Local\Temp 里；
     2) 用 NSIS 编译安装程序，产物在仓库根目录的 release\。
-    安装程序按当前用户安装到用户选定目录（默认 %LOCALAPPDATA%\Programs\文件互传助手），
-    不需要管理员权限；安装向导最后一页默认勾选「创建桌面快捷方式」。
+    安装程序把文件全部装到向导里选的目录（默认 D:\Program Files\文件互传助手）；
+    完成页有「创建桌面快捷方式」，默认勾选，点「完成」时才创建。
 
 .PARAMETER Configuration
     构建配置，默认 Release。

@@ -33,7 +33,7 @@ ManifestDPIAware true
 
 Name "${APP_NAME}"
 OutFile "${REPO_ROOT}\release\${APP_NAME}-${APP_VERSION}-安装包.exe"
-InstallDir "$LOCALAPPDATA\Programs\${APP_NAME}"
+InstallDir "D:\Program Files\${APP_NAME}"
 InstallDirRegKey HKCU "Software\${APP_KEY}" "InstallDir"
 
 VIProductVersion "${APP_VER4}"
@@ -54,9 +54,12 @@ VIAddVersionKey /LANG=2052 "LegalCopyright"   "Copyright (c) ${APP_NAME}"
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !define MUI_FINISHPAGE_TITLE "安装完成"
-!define MUI_FINISHPAGE_TEXT "${APP_NAME} ${APP_VERSION} 已安装完成。$\r$\n$\r$\n点击「完成」退出安装向导。"
-!define MUI_PAGE_CUSTOMFUNCTION_SHOW  FinishPageShow
-!define MUI_PAGE_CUSTOMFUNCTION_LEAVE FinishPageLeave
+!define MUI_FINISHPAGE_TEXT "${APP_NAME} ${APP_VERSION} 已安装完成。$\r$\n$\r$\n点「完成」时才会执行下面勾选的操作。"
+!define MUI_FINISHPAGE_RUN "$INSTDIR\${APP_EXE}"
+!define MUI_FINISHPAGE_RUN_TEXT "立即运行 ${APP_NAME}"
+!define MUI_FINISHPAGE_SHOWREADME ""
+!define MUI_FINISHPAGE_SHOWREADME_TEXT "创建桌面快捷方式"
+!define MUI_FINISHPAGE_SHOWREADME_FUNCTION CreateDesktopShortcut
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
@@ -67,10 +70,6 @@ ShowInstDetails nevershow
 ShowUninstDetails nevershow
 BrandingText "${APP_NAME} ${APP_VERSION}"
 XPStyle on
-
-Var ShortcutCheck
-Var RunCheck
-Var FinishUiReady
 
 ; 目标程序是否正在运行（运行中无法覆盖/删除 exe，提前提示）
 !macro IsAppLocked RESULT
@@ -102,36 +101,9 @@ Function un.onInit
   ${EndIf}
 FunctionEnd
 
-Function FinishPageShow
-  ; 完成页不需要「上一步」
-  GetDlgItem $0 $HWNDPARENT 3
-  ShowWindow $0 ${SW_HIDE}
-
-  ${If} $FinishUiReady == 1
-    Return
-  ${EndIf}
-  StrCpy $FinishUiReady 1
-
-  ; 完成页上的两个选项：创建桌面快捷方式 / 立即运行
-  ${NSD_CreateCheckbox} 120u 100u 200u 12u "创建桌面快捷方式"
-  Pop $ShortcutCheck
-  ${NSD_Check} $ShortcutCheck
-
-  ${NSD_CreateCheckbox} 120u 118u 200u 12u "立即运行 ${APP_NAME}"
-  Pop $RunCheck
-  ${NSD_Check} $RunCheck
-FunctionEnd
-
-Function FinishPageLeave
-  ${NSD_GetState} $ShortcutCheck $0
-  ${If} $0 == ${BST_CHECKED}
-    CreateShortCut "$DESKTOP\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\app.ico" 0 SW_SHOWNORMAL
-  ${EndIf}
-
-  ${NSD_GetState} $RunCheck $0
-  ${If} $0 == ${BST_CHECKED}
-    Exec '"$INSTDIR\${APP_EXE}"'
-  ${EndIf}
+; 完成页勾选「创建桌面快捷方式」并点「完成」时才创建；安装过程本身不建快捷键。
+Function CreateDesktopShortcut
+  CreateShortCut "$DESKTOP\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\app.ico" 0 SW_SHOWNORMAL
 FunctionEnd
 
 Section "主程序" SecMain
