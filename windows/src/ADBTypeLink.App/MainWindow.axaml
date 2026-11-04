@@ -376,6 +376,9 @@
                   <MenuItem Header="修改接收目录…" Click="OnChangeReceiveDir" />
                   <MenuItem Header="在文件管理器中打开接收目录" Click="OnOpenReceiveDir" />
                   <MenuItem Header="打开运行日志…" Click="OnOpenLogFile" />
+                  <Separator />
+                  <MenuItem Header="隐藏到托盘" Click="OnHideToTray" />
+                  <MenuItem Header="退出程序" Click="OnExitApplication" />
                 </MenuFlyout>
               </Button.Flyout>
             </Button>

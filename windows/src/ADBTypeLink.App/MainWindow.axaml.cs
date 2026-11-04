@@ -48,12 +48,35 @@ public partial class MainWindow : Window
         RootGrid.AddHandler(DragDrop.DropEvent, OnDrop);
 
         Opened += OnOpened;
+        Closing += OnClosing;
         Closed += OnClosed;
     }
 
     public MainViewModel ViewModel => _viewModel;
 
     // MARK: - 生命周期
+
+    /// <summary>
+    /// 右上角 ✕ / Alt+F4 不再退出进程，只把窗口收进托盘，后台继续收发文件、
+    /// 也能收到别人发来的东西。真正退出走托盘右键菜单或界面「⋯ → 退出程序」。
+    /// 系统关机 / 注销时照常关闭，不挡住 Windows。
+    /// </summary>
+    private void OnClosing(object? sender, WindowClosingEventArgs e)
+    {
+        if (e.CloseReason is WindowCloseReason.OSShutdown or WindowCloseReason.ApplicationShutdown)
+        {
+            return;
+        }
+
+        var app = App.Instance;
+        if (app is null || app.IsExitRequested || !app.IsTrayAvailable)
+        {
+            return;
+        }
+
+        e.Cancel = true;
+        Hide();
+    }
 
     private async void OnOpened(object? sender, EventArgs e)
     {
@@ -508,6 +531,22 @@ public partial class MainWindow : Window
     private void OnForgetAllPairs(object? sender, RoutedEventArgs e)
     {
         _viewModel.ForgetAllPairs();
+    }
+
+    private void OnHideToTray(object? sender, RoutedEventArgs e)
+    {
+        if (App.Instance?.IsTrayAvailable == true)
+        {
+            Hide();
+            return;
+        }
+
+        _viewModel.SetLocalFailure("托盘不可用，不能最小化到托盘");
+    }
+
+    private void OnExitApplication(object? sender, RoutedEventArgs e)
+    {
+        App.Instance?.ExitApplication();
     }
 
     private void OnDismissPairRequest(object? sender, RoutedEventArgs e)

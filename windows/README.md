@@ -77,7 +77,7 @@ powershell -ExecutionPolicy Bypass -File .\build-release.ps1
 （`ADBTypeLink.App.exe` + `libSkiaSharp.dll` / `av_libglesv2.dll` / `libHarfBuzzSharp.dll`，
 原生库随程序放在安装目录，运行时不再解压到 `C:\...\Temp`），再用 NSIS 编译安装程序到仓库根目录：
 
-- `release\文件互传助手-2.0.0-安装包.exe`：带安装向导，安装位置由向导里选择
+- `release\文件互传助手-2.0.1-安装包.exe`：带安装向导，安装位置由向导里选择
   （默认 `D:\Program Files\文件互传助手`，向导里随时可以改），
   **完成页有「创建桌面快捷方式」勾选项、默认勾选，点「完成」时才创建**；同时创建开始菜单项和「设置 → 应用」卸载项；
 - 只重打安装包（复用现有 exe）：`-SkipBuild`；
@@ -115,6 +115,9 @@ dotnet run --project src/ADBTypeLink.App -c Release
    这时右键的「打开位置」按 **文件 → 它原来的文件夹 → 设置里的接收目录** 逐级兜底，
    不会出现点了没反应的死路。
    `⋯` 菜单可「设置别名 / 清除全部别名」、清空记录、修改接收目录。
+7. 点右上角 `✕`（或按 `Alt+F4`）**不会退出程序**，窗口只是收进**托盘**，后台继续收发文字和文件。
+   左键点托盘图标恢复窗口；右键托盘图标可「显示主窗口 / 退出文件互传助手」，
+   界面里的 `⋯ → 退出程序` 也能真正退出。
 
 ### 移动设备（adb）
 

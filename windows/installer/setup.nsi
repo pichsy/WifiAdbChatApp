@@ -20,8 +20,8 @@ ManifestDPIAware true
 !include "FileFunc.nsh"
 
 !define APP_NAME      "文件互传助手"
-!define APP_VERSION   "2.0.0"
-!define APP_VER4      "2.0.0.0"
+!define APP_VERSION   "2.0.1"
+!define APP_VER4      "2.0.1.0"
 !define APP_EXE       "ADBTypeLink.App.exe"
 !define APP_KEY       "WifiAdbChatApp"
 !define APP_UNINST    "Software\Microsoft\Windows\CurrentVersion\Uninstall\WifiAdbChatApp"
@@ -88,7 +88,7 @@ XPStyle on
 Function .onInit
   !insertmacro IsAppLocked $0
   ${If} $0 == 1
-    MessageBox MB_ICONSTOP|MB_OK "${APP_NAME} 正在运行。$\r$\n$\r$\n请先退出程序（可从任务栏右键退出），再重新运行安装包。"
+    MessageBox MB_ICONSTOP|MB_OK "${APP_NAME} 正在运行。$\r$\n$\r$\n请先退出程序（右键托盘图标 → 退出文件互传助手），再重新运行安装包。"
     Abort
   ${EndIf}
 FunctionEnd
