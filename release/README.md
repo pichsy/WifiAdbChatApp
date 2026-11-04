@@ -4,10 +4,10 @@
 
 | 平台 | 版本 | 文件 | 大小 | SHA-256 |
 | --- | --- | --- | --- | --- |
-| macOS | 2.0.0 | [文件互传助手-2.0.0.dmg](文件互传助手-2.0.0.dmg) | 3.4 MB | `f32bab947df849c949dab9b0e9ad58bb4bff34af69046fca227ac2bb2bacc730` |
+| macOS | 2.0.1 | [文件互传助手-2.0.1.dmg](文件互传助手-2.0.1.dmg) | 3.4 MB | `115f3d52775a0ae3456e210f6dc3f02312eff2ae559355f17ff67f74ed6c44fd` |
 | Windows | 2.0.0 | [文件互传助手-2.0.0-安装包.exe](文件互传助手-2.0.0-安装包.exe) | 28 MB | `c74008ec806746563b57b5bd52ad912ca59dd0692476ff1079144f91595b8a7d` |
 
-> macOS 2.0.0 为当前最新发布。Windows 安装包由
+> macOS 2.0.1 为当前最新发布。Windows 安装包由
 > `windows/build-release.ps1` 生成（内置 .NET 8 运行时，目标机器无需安装 .NET）。
 > 校验值也可在 [SHA256SUMS.txt](SHA256SUMS.txt) 里查到。
 
