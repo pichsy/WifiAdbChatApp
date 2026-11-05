@@ -3,7 +3,7 @@
 > 不登录、不传云、不装驱动。同一个 Wi-Fi 下，两台电脑像微信一样聊天、互传文字和文件；
 > 插上 USB，Mac 上输入的文字和选中的文件还能直接送进手机。
 >
-> 当前版本：macOS **2.2.0** · Android **2.2.0** · iOS **2.2.0** · Windows **2.1.0**
+> 当前版本：macOS **2.2.0** · Android **2.2.0** · iOS **2.2.0** · Windows **2.2.0**
 
 ## 1. 产品定位
 
@@ -276,7 +276,7 @@ Windows 端使用 .NET 8 + Avalonia，界面与 macOS 端保持同一套交互�
   （Android 8.0+，debug 签名）
 - iOS：[`release/文件互传助手-iOS-2.2.0.ipa`](../release/文件互传助手-iOS-2.2.0.ipa)
   （iOS 17+，未签名，需自行重签）
-- Windows：[`release/文件互传助手-2.1.0-安装包.exe`](../release/文件互传助手-2.1.0-安装包.exe)
+- Windows：[`release/文件互传助手-2.2.0-安装包.exe`](../release/文件互传助手-2.2.0-安装包.exe)
   （Windows 10 1809+ / 11 x64，自包含 .NET 运行时）
 - 校验值：[`release/SHA256SUMS.txt`](../release/SHA256SUMS.txt)
 

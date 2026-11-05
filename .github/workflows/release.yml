@@ -22,7 +22,7 @@ jobs:
           body_path: docs/release-notes-2.2.0.md
           files: |
             release/文件互传助手-2.2.0.dmg
-            release/文件互传助手-2.1.0-安装包.exe
+            release/文件互传助手-2.2.0-安装包.exe
             release/文件互传助手-Android-2.2.0.apk
             release/文件互传助手-iOS-2.2.0.ipa
             release/SHA256SUMS.txt

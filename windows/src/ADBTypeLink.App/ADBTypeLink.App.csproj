@@ -13,7 +13,7 @@
     <AssemblyTitle>文件互传助手</AssemblyTitle>
     <Product>文件互传助手</Product>
     <Description>文件互传助手 · 局域网文字/文件互传</Description>
-    <Version>2.1.0</Version>
+    <Version>2.2.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <EnableDefaultItems>true</EnableDefaultItems>

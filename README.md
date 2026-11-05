@@ -105,7 +105,7 @@ open 文件互传助手.app
 直接运行已打包好的安装程序：
 
 ```
-release\文件互传助手-2.1.0-安装包.exe
+release\文件互传助手-2.2.0-安装包.exe
 ```
 
 安装向导最后一页默认勾选「创建桌面快捷方式」，完成后桌面 / 开始菜单即可启动。
@@ -153,7 +153,7 @@ cd mobile/ios && xcodegen generate             # 然后用 Xcode / xcodebuild �
 - 未签名 IPA 不能直接安装，需要自己的 Apple Developer Team 用 Xcode 重签；
 - 收到文件在「文件」App › 我的 iPhone › 文件互传助手 › Downloads，图片/视频另存相册；
 
-**Windows 直接下载**：[`release/文件互传助手-2.1.0-安装包.exe`](release/文件互传助手-2.1.0-安装包.exe)
+**Windows 直接下载**：[`release/文件互传助手-2.2.0-安装包.exe`](release/文件互传助手-2.2.0-安装包.exe)
 （28.1 MB，Windows 10 1809+ / 11 x64）
 
 - 带安装向导的安装程序，内置 .NET 运行时，目标机器无需安装 .NET；
