@@ -7,7 +7,7 @@
 | macOS | 2.2.0 | [文件互传助手-2.2.0.dmg](文件互传助手-2.2.0.dmg) | 3.4 MB | `c2e3bbc4a50b2d61ddba242e0d510532da61203841bfba1f0a4a3a04ccd30c86` |
 | Android | 2.2.0 | [文件互传助手-Android-2.2.0.apk](文件互传助手-Android-2.2.0.apk) | 42 MB | `69a6c2341dacb6d85f368ff92de4da9f7b99e41b8db536a43d1e82d43e05b588` |
 | iOS | 2.2.0 | [文件互传助手-iOS-2.2.0.ipa](文件互传助手-iOS-2.2.0.ipa) | 2.2 MB | `84a9122d811cc6c403d6ddb37fedfb9f84892456c723c67f12ffc45f0ec58d81` |
-| Windows | 2.2.0 | [文件互传助手-2.2.0-安装包.exe](文件互传助手-2.2.0-安装包.exe) | 28.1 MB | `03acd6054b461278b3afa776ae4b8f79af893a50dad567c6bc6efe339708c5ae` |
+| Windows | 2.2.0 | [文件互传助手-2.2.0-安装包.exe](文件互传助手-2.2.0-安装包.exe) | 28.1 MB | `60ce64db9c6c253c7e398d683ea5dbfeee34f75a060e7da2ded513549b832ac2` |
 
 > 四端本轮统一为 **2.2.0**（macOS / Android / iOS / Windows）。
 > **iOS ipa 未签名**，需要用自己的 Apple Developer Team 重签后才能装真机；

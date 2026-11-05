@@ -39,11 +39,13 @@ public sealed class ScreenshotWindow : Window
     private readonly Button _refreshButton;
     private readonly Button _saveButton;
     private readonly Button _resetButton;
+    private readonly Button _openFolderButton;
     private readonly DispatcherTimer _toastTimer = new() { Interval = TimeSpan.FromSeconds(2) };
 
     private Bitmap? _bitmap;
     private byte[]? _png;
     private string _saveDir;
+    private string? _lastSavedFile;
     private bool _busy;
     private bool _dragging;
     private Point _dragStart;
@@ -107,6 +109,17 @@ public sealed class ScreenshotWindow : Window
         var chooseButton = MakeButton("保存位置…", () => _ = ChooseFolderAsync());
         var closeButton = MakeButton("关闭", () => Close());
 
+        // 「保存位置」后面的文件夹按钮：打开最近一次保存的截屏所在目录（还没保存过就打开保存目录）。
+        _openFolderButton = new Button
+        {
+            Content = "📂",
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(2, 0, 0, 0),
+        };
+        _openFolderButton.Classes.Add("icon");
+        ToolTip.SetTip(_openFolderButton, "打开截屏所在的文件夹");
+        _openFolderButton.Click += (_, _) => OpenSaveFolder();
+
         _percentText.Text = "100%";
         _percentText.FontSize = 9;
         _percentText.HorizontalAlignment = HorizontalAlignment.Center;
@@ -119,18 +132,30 @@ public sealed class ScreenshotWindow : Window
         _pathText.FontSize = 11;
         _pathText.Foreground = Brush(0x88, 0x88, 0x88);
         _pathText.TextTrimming = TextTrimming.CharacterEllipsis;
-        _pathText.Text = $"保存到：{_saveDir}";
+        _pathText.VerticalAlignment = VerticalAlignment.Center;
+        UpdatePathText();
 
         _statusText.FontSize = 11;
         _statusText.Foreground = Brush(0x88, 0x88, 0x88);
         _statusText.TextWrapping = TextWrapping.Wrap;
 
         var header = BuildHeader(chooseButton, closeButton);
+
+        // 左下角「保存到：…」+ 紧跟其后的文件夹按钮（长路径自动省略，按钮始终可见）。
+        var pathRow = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*"),
+        };
+        Grid.SetColumn(_pathText, 0);
+        Grid.SetColumn(_openFolderButton, 1);
+        pathRow.Children.Add(_pathText);
+        pathRow.Children.Add(_openFolderButton);
+
         var footer = new StackPanel
         {
             Spacing = 4,
             Margin = new Thickness(16, 10),
-            Children = { _pathText, _statusText },
+            Children = { pathRow, _statusText },
         };
 
         var grid = new Grid
@@ -416,7 +441,8 @@ public sealed class ScreenshotWindow : Window
             {
                 _saveDir = DefaultSaveDir();
                 SaveSaveDir(_saveDir);
-                _pathText.Text = $"保存到：{_saveDir}";
+                _lastSavedFile = null;
+                UpdatePathText();
             }
 
             Directory.CreateDirectory(_saveDir);
@@ -430,6 +456,7 @@ public sealed class ScreenshotWindow : Window
             }
 
             File.WriteAllBytes(path, _png);
+            _lastSavedFile = path;
             _statusText.Text = $"截屏已保存到 {path}";
             _statusText.Foreground = Brush(0x88, 0x88, 0x88);
             ShowToast();
@@ -461,9 +488,51 @@ public sealed class ScreenshotWindow : Window
 
         _saveDir = path;
         SaveSaveDir(path);
-        _pathText.Text = $"保存到：{_saveDir}";
+        _lastSavedFile = null;
+        UpdatePathText();
         _statusText.Text = $"截屏保存目录已改为 {_saveDir}";
         _statusText.Foreground = Brush(0x88, 0x88, 0x88);
+    }
+
+    /// <summary>
+    /// 打开截屏所在的文件夹：最近一次保存过就定位到那个文件（资源管理器选中它），
+    /// 否则直接打开保存目录（目录不存在就先建出来）。
+    /// </summary>
+    private void OpenSaveFolder()
+    {
+        try
+        {
+            if (_lastSavedFile is { } saved && File.Exists(saved) && ShellLauncher.TryRevealFile(saved))
+            {
+                return;
+            }
+
+            if (!Directory.Exists(_saveDir))
+            {
+                Directory.CreateDirectory(_saveDir);
+                SaveSaveDir(_saveDir);
+                UpdatePathText();
+            }
+
+            if (ShellLauncher.TryOpenDirectory(_saveDir))
+            {
+                return;
+            }
+
+            _statusText.Text = $"打不开保存目录：{_saveDir}";
+            _statusText.Foreground = Brush(0xD1, 0x5B, 0x4A);
+        }
+        catch (Exception ex)
+        {
+            _statusText.Text = $"打不开保存目录：{ex.Message}";
+            _statusText.Foreground = Brush(0xD1, 0x5B, 0x4A);
+        }
+    }
+
+    private void UpdatePathText()
+    {
+        _pathText.Text = $"保存到：{_saveDir}";
+        ToolTip.SetTip(_pathText, _saveDir);
     }
 
     private void ShowToast()
