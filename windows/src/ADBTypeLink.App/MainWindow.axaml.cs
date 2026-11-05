@@ -819,6 +819,11 @@ public partial class MainWindow : Window
         _ = _viewModel.Mobile.SendTextAsync();
     }
 
+    private void OnMobileScreenshot(object? sender, RoutedEventArgs e)
+    {
+        ScreenshotWindow.Present(_viewModel.Mobile);
+    }
+
     private async void OnMobileRefresh(object? sender, RoutedEventArgs e)
     {
         try

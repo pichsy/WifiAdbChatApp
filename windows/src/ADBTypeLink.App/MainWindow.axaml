@@ -23,6 +23,9 @@
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
                   <ProgressBar IsIndeterminate="True" Width="60" Height="4"
                                IsVisible="{Binding Mobile.Scanning}" VerticalAlignment="Center" />
+                  <Button Classes="link" Content="截屏" Click="OnMobileScreenshot"
+                          IsEnabled="{Binding Mobile.HasDevices}"
+                          ToolTip.Tip="截取手机当前屏幕" />
                   <Button Classes="icon" Content="↻" Click="OnMobileRefresh"
                           ToolTip.Tip="刷新设备列表" />
                 </StackPanel>

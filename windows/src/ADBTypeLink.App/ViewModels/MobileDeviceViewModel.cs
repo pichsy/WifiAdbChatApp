@@ -568,6 +568,32 @@ public sealed class MobileDeviceViewModel : ObservableObject
         }
     }
 
+    // MARK: - 截屏
+
+    /// <summary>截取当前选中手机的屏幕；没有设备 / adb 不可用时返回中文错误。</summary>
+    public async Task<(byte[]? Data, string? Error)> CaptureScreenshotAsync()
+    {
+        if (!AdbAvailable)
+        {
+            return (null, "未找到 adb（platform-tools），请在底部「设置 adb…」里指定");
+        }
+
+        var device = _selectedDevice;
+        if (device is null)
+        {
+            return (null, DeviceError ?? "未检测到设备，请连接手机并开启 USB 调试");
+        }
+
+        try
+        {
+            return await _adb.CaptureScreenshotAsync(device.Serial).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            return (null, $"截屏失败：{ex.Message}");
+        }
+    }
+
     // MARK: - 历史
 
     public bool HasHistory => _history.Count > 0;

@@ -32,6 +32,8 @@ public sealed class AdbService
     /// <summary>推送到手机的手机端剪贴板组件路径。</summary>
     public const string ClipJarRemotePath = "/data/local/tmp/adbtype-clip.jar";
 
+    private static readonly byte[] PngHeader = { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+
     private readonly HashSet<string> _clipPushed = new(StringComparer.Ordinal);
     private readonly object _clipGate = new();
 
@@ -297,6 +299,127 @@ public sealed class AdbService
         }
 
         return null;
+    }
+
+    // MARK: - 截屏
+
+    /// <summary>
+    /// 截取手机当前屏幕，返回原始 PNG。必须用 `exec-out` 读二进制，
+    /// 不能走 RunAsync 的文本管道，否则 PNG 会被文本解码破坏。
+    /// </summary>
+    public async Task<(byte[]? Data, string? Error)> CaptureScreenshotAsync(
+        string serial,
+        TimeSpan? timeout = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!IsAvailable)
+        {
+            return (null, "未找到 adb（platform-tools）");
+        }
+
+        var startInfo = new ProcessStartInfo(AdbPath)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        foreach (var argument in new[] { "-s", serial, "exec-out", "screencap", "-p" })
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var process = new Process { StartInfo = startInfo };
+        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutSource.CancelAfter(timeout ?? TimeSpan.FromSeconds(30));
+
+        try
+        {
+            if (!process.Start())
+            {
+                return (null, $"无法启动 {AdbPath}");
+            }
+        }
+        catch (Exception ex)
+        {
+            return (null, $"无法运行 {AdbPath}：{ex.Message}");
+        }
+
+        var stdoutTask = ReadAllBytesAsync(process.StandardOutput.BaseStream, timeoutSource.Token);
+        var stderrTask = process.StandardError.ReadToEndAsync();
+
+        var timedOut = false;
+        var cancelled = false;
+        try
+        {
+            await process.WaitForExitAsync(timeoutSource.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            cancelled = cancellationToken.IsCancellationRequested;
+            timedOut = !cancelled;
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+            }
+            catch (Exception)
+            {
+                // 已经退出。
+            }
+        }
+
+        byte[]? data = null;
+        try
+        {
+            data = await stdoutTask.ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // 超时 / 取消时读取会被中断。
+        }
+
+        var stderr = string.Empty;
+        try
+        {
+            stderr = (await stderrTask.ConfigureAwait(false)).Trim();
+        }
+        catch (Exception)
+        {
+            // 超时 / 取消时读取会被中断。
+        }
+
+        if (cancelled)
+        {
+            return (null, "已取消");
+        }
+
+        if (timedOut)
+        {
+            return (null, "截屏超时，请确认手机已解锁、USB 调试已允许");
+        }
+
+        if (data is null || data.Length == 0)
+        {
+            return (null, Friendly(stderr, "截屏失败，请确认手机已解锁、USB 调试已允许"));
+        }
+
+        // PNG 文件头：89 50 4E 47 0D 0A 1A 0A
+        if (data.Length <= 8 || !data.AsSpan(0, 8).SequenceEqual(PngHeader))
+        {
+            return (null, "截屏失败：返回数据不是有效 PNG" + (stderr.Length == 0 ? string.Empty : $"（{Shorten(stderr, 2)}）"));
+        }
+
+        return (data, null);
+    }
+
+    private static async Task<byte[]> ReadAllBytesAsync(Stream stream, CancellationToken cancellationToken)
+    {
+        using var buffer = new MemoryStream();
+        await stream.CopyToAsync(buffer, 81920, cancellationToken).ConfigureAwait(false);
+        return buffer.ToArray();
     }
 
     // MARK: - 文件推送
