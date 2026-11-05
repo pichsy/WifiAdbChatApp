@@ -9,7 +9,6 @@ struct MobileDeviceView: View {
     @FocusState private var inputFocused: Bool
     @State private var didFocusOnLaunch = false
     @State private var isFileDropTarget = false
-    @State private var showScreenshot = false
 
     private let ticker = Timer.publish(every: 4, on: .main, in: .common).autoconnect()
 
@@ -62,9 +61,6 @@ struct MobileDeviceView: View {
         .onReceive(ticker) { _ in
             model.autoTick()
         }
-        .sheet(isPresented: $showScreenshot) {
-            ScreenshotSheet(model: model)
-        }
     }
 
     // MARK: - 卡片外观
@@ -105,7 +101,7 @@ struct MobileDeviceView: View {
                 }
                 Button {
                     model.captureScreenshot()
-                    showScreenshot = true
+                    ScreenshotWindowController.present(model: model)
                 } label: {
                     Label("截屏", systemImage: "camera")
                 }

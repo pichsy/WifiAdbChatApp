@@ -4,7 +4,7 @@ import AppKit
 /// 手机截屏弹窗：预览、刷新、保存、选择保存目录。
 struct ScreenshotSheet: View {
     @ObservedObject var model: AppModel
-    @Environment(\.dismiss) private var dismiss
+    var onClose: () -> Void = {}
     @State private var toastMessage: String?
     @State private var toastDismissWork: DispatchWorkItem?
 
@@ -22,7 +22,8 @@ struct ScreenshotSheet: View {
             Divider()
             footer
         }
-        .frame(width: 900, height: 720)
+        .frame(minWidth: 780, minHeight: 500)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
         .overlay(alignment: .bottom) {
             if let toastMessage {
@@ -101,7 +102,7 @@ struct ScreenshotSheet: View {
             }
             .help("选择截屏保存目录")
 
-            Button("关闭") { dismiss() }
+            Button("关闭") { onClose() }
                 .keyboardShortcut(.cancelAction)
         }
         .padding(.horizontal, 16)
