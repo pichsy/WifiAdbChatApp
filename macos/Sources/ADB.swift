@@ -27,6 +27,7 @@ enum DefaultsKey {
     static let pressEnter = "pressEnter"
     static let selectedSerial = "selectedSerial"
     static let history = "history"
+    static let screenshotDir = "screenshotDir"
 }
 
 enum ADB {
@@ -79,6 +80,54 @@ enum ADB {
             result = runOnce(executable, arguments, timeout: timeout)
         }
         return result
+    }
+
+    /// 截取手机当前屏幕，返回原始 PNG 数据。
+    /// 必须用 `exec-out` 而不是 `shell`，否则 Windows/部分设备会把换行符转成 CRLF 破坏 PNG。
+    static func captureScreenshot(adb: String,
+                                  serial: String,
+                                  timeout: TimeInterval = 30) -> (data: Data?, error: String?) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: adb)
+        process.arguments = ["-s", serial, "exec-out", "screencap", "-p"]
+        var environment = ProcessInfo.processInfo.environment
+        environment["LC_ALL"] = "C"
+        environment["LANG"] = "C"
+        process.environment = environment
+
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        process.standardOutput = outPipe
+        process.standardError = errPipe
+
+        do {
+            try process.run()
+        } catch {
+            return (nil, "无法运行 adb：\(error.localizedDescription)")
+        }
+
+        let watchdog = DispatchWorkItem {
+            if process.isRunning { process.terminate() }
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: watchdog)
+
+        let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
+        let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        watchdog.cancel()
+
+        let stderr = String(data: errData, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard process.terminationStatus == 0, !outData.isEmpty else {
+            return (nil, stderr.isEmpty ? "截屏失败，请确认手机已解锁、USB 调试已允许" : stderr)
+        }
+        // PNG 文件头：89 50 4E 47 0D 0A 1A 0A
+        let pngHeader: [UInt8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
+        guard outData.count > 8, Array(outData.prefix(8)) == pngHeader else {
+            let hint = stderr.isEmpty ? "返回数据不是有效 PNG" : stderr
+            return (nil, "截屏失败：\(hint)")
+        }
+        return (outData, nil)
     }
 
     // MARK: - 定位 adb

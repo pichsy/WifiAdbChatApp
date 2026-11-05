@@ -34,6 +34,12 @@ Windows 端在 [`windows/`](../windows/)；移动端规划见 [`mobile/`](../mob
 - 拖拽 / 选择 / 粘贴文件加入「待发送列表」，可单个移除或清空，点「传到手机」才发送；
 - 目标目录可编辑，默认 `/sdcard/Download`，带进度显示。
 
+设备卡片右上角还有**截屏**：
+
+- 点「截屏」用 `adb exec-out screencap -p` 抓取手机当前屏幕，弹窗预览；
+- 弹窗内可「刷新截屏」「保存截屏」「保存位置…」；默认保存到系统「下载」目录，文件名带时间戳，重名自动编号；
+- 手机锁屏 / 未授权 USB 调试时给出错误提示，不影响其他功能。
+
 ### 使用手机功能
 
 - 顶部选择设备（多台手机时）；插拔会自动刷新（窗口在前台时每 4 秒静默刷新一次）。
@@ -147,7 +153,8 @@ adb -s <serial> shell input keyevent 66              # 回车
 | `Sources/FileTransferModel.swift` | 手机文件传输（拖拽/选择/粘贴、进度、目标目录） |
 | `Sources/LANTransfer.swift` | 局域网协议核心：UDP 发现、TCP 帧、配对、文字/文件收发、聊天记录持久化 |
 | `Sources/LANTransferView.swift` | 「电脑设备」页：微信式聊天界面（设备列表 + 聊天 + 底部输入框） |
-| `Sources/MobileDeviceView.swift` | 「移动设备」页 |
+| `Sources/MobileDeviceView.swift` | 「移动设备」页（文字 / 文件 / 截屏入口） |
+| `Sources/ScreenshotSheet.swift` | 手机截屏弹窗（预览 / 刷新 / 保存 / 选目录） |
 | `Sources/ContentView.swift` | 双 Tab 容器 |
 | `Sources/ADBTypeApp.swift` | App 入口与菜单 |
 | `Resources/Info.plist` | App 版本、本地网络权限说明等 |
@@ -163,8 +170,8 @@ adb -s <serial> shell input keyevent 66              # 回车
 
 ## 更新记录
 
-- **2.1.0**：三端版本号统一（macOS / Android / iOS）；本版 macOS 功能与 2.0.1 一致，
-  仅版本号与发布包更新。
+- **2.1.0**：三端版本号统一（macOS / Android / iOS）；macOS「移动设备」页新增**截屏**：
+  设备卡片点「截屏」抓取手机当前屏幕，弹窗预览，支持刷新、保存、选择保存目录（默认系统「下载」）。
 - **2.0.1**：窗口红色关闭按钮改为「最小化到 Dock」，不再关掉窗口/退出进程；点 Dock 图标或
   重新打开 App 会还原窗口。真正退出仍需 ⌘Q 或 Dock 菜单「退出」。
 - **2.0.0**：macOS 端大版本更新：已配对好友列表与本地别名、每设备独立会话缓存、离线保留、

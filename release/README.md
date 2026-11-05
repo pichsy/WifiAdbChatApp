@@ -4,7 +4,7 @@
 
 | 平台 | 版本 | 文件 | 大小 | SHA-256 |
 | --- | --- | --- | --- | --- |
-| macOS | 2.1.0 | [文件互传助手-2.1.0.dmg](文件互传助手-2.1.0.dmg) | 3.4 MB | `cdc924a929f12ddf4c5e5b7a41edf4c4e8bd2eb0a01cc98aa06ad99632eb549c` |
+| macOS | 2.1.0 | [文件互传助手-2.1.0.dmg](文件互传助手-2.1.0.dmg) | 3.5 MB | `5b05b9dba1e1757c110711adfd55725c159c9c8c5f00ed4b748b6cb5f5a1b58a` |
 | Android | 2.1.0 | [文件互传助手-Android-2.1.0.apk](文件互传助手-Android-2.1.0.apk) | 42 MB | `a36f221f682a52f589594b54b532904e1857523cfd8e24e6476df380b79505f0` |
 | iOS | 2.1.0 | [文件互传助手-iOS-2.1.0.ipa](文件互传助手-iOS-2.1.0.ipa) | 2.2 MB | `f05e37d5a3c324f8c3139ec09bbff0bd1cbe7889fd6d4115f9bb4f09d2bd3bf7` |
 | Windows | 2.1.0 | [文件互传助手-2.1.0-安装包.exe](文件互传助手-2.1.0-安装包.exe) | 28.1 MB | `a6ea8ae0e4bbf0c7e6b5905d52332ce2ba8bac83736d0ef5dfbd23654f10570c` |

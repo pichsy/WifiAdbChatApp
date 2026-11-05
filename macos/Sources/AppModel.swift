@@ -24,6 +24,14 @@ final class AppModel: ObservableObject {
     @Published var deviceError: String? = nil
     @Published var history: [String] = []
 
+    @Published var screenshotImage: NSImage?
+    @Published var screenshotData: Data?
+    @Published var screenshotAt: Date?
+    @Published var screenshotBusy = false
+    @Published var screenshotError: String?
+    @Published var screenshotSavedURL: URL?
+    @Published var screenshotSaveDir: String = "" { didSet { defaults.set(screenshotSaveDir, forKey: DefaultsKey.screenshotDir) } }
+
     private var scanningInFlight = false
     /// 已经推送过剪贴板 dex 的设备，避免每次发送都推一遍
     private var clipPushedSerials = Set<String>()
@@ -40,6 +48,9 @@ final class AppModel: ObservableObject {
         pressEnter = defaults.bool(forKey: DefaultsKey.pressEnter)
         selectedSerial = defaults.string(forKey: DefaultsKey.selectedSerial) ?? ""
         history = defaults.stringArray(forKey: DefaultsKey.history) ?? []
+        screenshotSaveDir = defaults.string(forKey: DefaultsKey.screenshotDir)
+            ?? FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first?.path
+            ?? (NSHomeDirectory() + "/Downloads")
 
         if let savedPath = defaults.string(forKey: DefaultsKey.adbPath),
            FileManager.default.isExecutableFile(atPath: savedPath) {
@@ -123,6 +134,114 @@ final class AppModel: ObservableObject {
                 }
             }
         }
+    }
+
+    // MARK: - 截屏
+
+    private static let screenshotNameFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        return formatter
+    }()
+
+    /// 抓取当前选中 Android 手机的屏幕。
+    func captureScreenshot() {
+        guard adbAvailable else {
+            screenshotError = "adb 不可用，请先在右下角重新选择 adb 路径"
+            statusKind = .failure
+            statusText = screenshotError ?? "adb 不可用"
+            return
+        }
+        guard let device = selectedDevice else {
+            screenshotError = deviceError ?? "未检测到设备，请连接手机并允许 USB 调试"
+            statusKind = .failure
+            statusText = screenshotError ?? "未检测到设备"
+            return
+        }
+        guard !screenshotBusy else { return }
+
+        screenshotBusy = true
+        screenshotError = nil
+        screenshotSavedURL = nil
+        statusKind = .idle
+        statusText = "正在截取 \(device.displayName) 的屏幕…"
+
+        let adb = adbPath
+        let serial = device.serial
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let result = ADB.captureScreenshot(adb: adb, serial: serial)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.screenshotBusy = false
+                if let data = result.data, let image = NSImage(data: data) {
+                    self.screenshotData = data
+                    self.screenshotImage = image
+                    self.screenshotAt = Date()
+                    self.screenshotError = nil
+                    self.statusKind = .success
+                    self.statusText = "已截取 \(device.displayName) 的屏幕"
+                } else {
+                    self.screenshotError = result.error ?? "截屏失败"
+                    self.statusKind = .failure
+                    self.statusText = self.screenshotError ?? "截屏失败"
+                }
+            }
+        }
+    }
+
+    /// 保存当前截屏到选定目录（默认系统「下载」目录），自动加时间戳和重名编号。
+    func saveScreenshot() {
+        guard let data = screenshotData else {
+            screenshotError = "还没有截屏可保存"
+            return
+        }
+        var directory = URL(fileURLWithPath: screenshotSaveDir.isEmpty ? NSHomeDirectory() + "/Downloads" : screenshotSaveDir,
+                            isDirectory: true)
+        if !FileManager.default.fileExists(atPath: directory.path) {
+            directory = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+                ?? URL(fileURLWithPath: NSHomeDirectory() + "/Downloads", isDirectory: true)
+        }
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let stamp = Self.screenshotNameFormatter.string(from: Date())
+            var url = directory.appendingPathComponent("截屏-\(stamp).png")
+            var index = 2
+            while FileManager.default.fileExists(atPath: url.path) {
+                url = directory.appendingPathComponent("截屏-\(stamp) (\(index)).png")
+                index += 1
+            }
+            try data.write(to: url, options: .atomic)
+            screenshotSaveDir = directory.path
+            screenshotSavedURL = url
+            screenshotError = nil
+            statusKind = .success
+            statusText = "截屏已保存到 \(url.path)"
+        } catch {
+            screenshotError = "保存截屏失败：\(error.localizedDescription)"
+            statusKind = .failure
+            statusText = screenshotError ?? "保存截屏失败"
+        }
+    }
+
+    func chooseScreenshotDirectory() {
+        let panel = NSOpenPanel()
+        panel.title = "选择截屏保存目录"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.directoryURL = URL(fileURLWithPath: screenshotSaveDir.isEmpty ? NSHomeDirectory() + "/Downloads" : screenshotSaveDir,
+                                 isDirectory: true)
+        if panel.runModal() == .OK, let url = panel.url {
+            screenshotSaveDir = url.path
+            screenshotError = nil
+            statusKind = .idle
+            statusText = "截屏保存目录已改为 \(url.path)"
+        }
+    }
+
+    func revealSavedScreenshot() {
+        guard let url = screenshotSavedURL else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
     // MARK: - 发送

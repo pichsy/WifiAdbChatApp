@@ -46,7 +46,7 @@
 
 | 端 | 状态 | 说明 |
 | --- | --- | --- |
-| macOS | ✅ 可运行 | 手机输入 / 手机文件传输 / 电脑聊天互传；已配对好友列表 + 别名 + 每设备独立会话 + 自动/手动重连 + 发送进度/取消 + 消息右键菜单/文件缺失删除线/关闭按钮最小化；已打包 2.1.0（dmg + zip） |
+| macOS | ✅ 可运行 | 手机输入 / 手机文件传输 / 手机截屏 / 电脑聊天互传；已配对好友列表 + 别名 + 每设备独立会话 + 自动/手动重连 + 发送进度/取消 + 消息右键菜单/文件缺失删除线/关闭按钮最小化；已打包 2.1.0（dmg + zip） |
 | Windows | ✅ 代码完成，安装包可用 | macOS 上编译 0 warning、冒烟测试 37/37 + 9/9、与 macOS 端双向真实收发通过；Windows 真机上安装 / 桌面快捷方式 / 卸载已验证；关闭窗口收进托盘，后台继续收发 |
 | Android | ✅ 原生已实现 | Kotlin + Compose，minSdk 28；只做电脑互传；公开 Downloads 落盘 + 图片/视频缩略图/filepicker 预览；HUAWEI 真机联调通过 |
 | iOS | ✅ 原生已实现 | SwiftUI，iOS 17+；只做电脑互传；Documents/Downloads + 系统相册；缩略图/AVKit 播放；iPhone 17 模拟器 49 tests + UI 测试通过（真机需签名） |
@@ -134,7 +134,7 @@ cd mobile/ios && xcodegen generate             # 然后用 Xcode / xcodebuild �
 ## 下载与安装包
 
 **macOS 直接下载**：[`release/文件互传助手-2.1.0.dmg`](release/文件互传助手-2.1.0.dmg)
-（3.4 MB，macOS 13+，Apple 芯片 / Intel 通用）
+（3.5 MB，macOS 13+，Apple 芯片 / Intel 通用）
 
 - 双击 dmg，把「文件互传助手.app」拖进「应用程序」覆盖旧版即可；
 - 未签名 / 未公证，首次打开如被拦：右键「打开」，或执行 dmg 里的 `授权并安装.sh`；
