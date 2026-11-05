@@ -8,9 +8,14 @@
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource AppBackgroundBrush}">
 
-  <TabControl x:Name="MainTabs" Padding="0">
+  <TabControl x:Name="MainTabs" Padding="0" Classes="mainTabs">
+    <TabControl.ItemsPanel>
+      <ItemsPanelTemplate>
+        <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center" />
+      </ItemsPanelTemplate>
+    </TabControl.ItemsPanel>
 
-    <TabItem Header="📱  移动设备">
+    <TabItem Header="移动设备">
       <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="20" Spacing="12" MaxWidth="860" HorizontalAlignment="Stretch">
 
@@ -181,7 +186,7 @@
       </ScrollViewer>
     </TabItem>
 
-    <TabItem Header="💻  电脑设备">
+    <TabItem Header="电脑设备">
   <Grid x:Name="RootGrid" ColumnDefinitions="260,*">
 
     <!-- ============ 左侧：设备列表 + 本机 ============ -->

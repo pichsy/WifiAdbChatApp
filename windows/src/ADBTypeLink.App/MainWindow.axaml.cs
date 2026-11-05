@@ -81,6 +81,7 @@ public partial class MainWindow : Window
     private async void OnOpened(object? sender, EventArgs e)
     {
         Opened -= OnOpened;
+        WindowEffects.ApplyRoundedCorners(this);
 
         if (!_autoStart)
         {

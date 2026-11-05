@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
+using ADBTypeLink.App.Helpers;
 using ADBTypeLink.App.ViewModels;
 using Avalonia;
 using Avalonia.Controls;
@@ -175,7 +176,11 @@ public sealed class ScreenshotWindow : Window
             _toast.IsVisible = false;
         };
 
-        Opened += (_, _) => _ = CaptureAsync();
+        Opened += (_, _) =>
+        {
+            WindowEffects.ApplyRoundedCorners(this);
+            _ = CaptureAsync();
+        };
         Closed += (_, _) =>
         {
             _toastTimer.Stop();
