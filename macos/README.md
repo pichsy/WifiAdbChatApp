@@ -107,7 +107,7 @@ open 文件互传助手.app
 
 ```bash
 cd macos
-./package.sh        # 生成 macos/dist/文件互传助手-2.1.0.dmg 和 macos/dist/文件互传助手-2.1.0-macOS.zip
+./package.sh        # 生成 macos/dist/文件互传助手-2.2.0.dmg 和 macos/dist/文件互传助手-2.2.0-macOS.zip
 ```
 
 - dmg / zip 里带《安装说明.txt》和「授权并安装.sh」（可执行 shell 脚本）：在终端执行
@@ -173,6 +173,8 @@ adb -s <serial> shell input keyevent 66              # 回车
 
 ## 更新记录
 
+- **2.2.0**：macOS / Android / iOS 三端版本号同步到 2.2.0；macOS 功能与 2.1.0 一致
+  （移动设备截屏、可缩放窗口、1:1/缩放百分比已包含），重新出 dmg 安装包。
 - **2.1.0**：三端版本号统一（macOS / Android / iOS）；macOS「移动设备」页新增**截屏**：
   设备卡片点「截屏」抓取手机当前屏幕，弹窗预览；支持刷新、保存、选择保存目录（默认系统「下载」）、
   保存 toast、捏合缩放/拖拽平移、双击缩放、1:1 恢复适应窗口和缩放百分比显示。

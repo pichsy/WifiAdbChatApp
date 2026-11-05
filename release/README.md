@@ -4,16 +4,17 @@
 
 | 平台 | 版本 | 文件 | 大小 | SHA-256 |
 | --- | --- | --- | --- | --- |
-| macOS | 2.1.0 | [文件互传助手-2.1.0.dmg](文件互传助手-2.1.0.dmg) | 3.5 MB | `3a50089ceb894cfea14bc4de95e1b9e591acdc3d576c2a14bb22124708b8f7fd` |
-| Android | 2.1.0 | [文件互传助手-Android-2.1.0.apk](文件互传助手-Android-2.1.0.apk) | 42 MB | `a36f221f682a52f589594b54b532904e1857523cfd8e24e6476df380b79505f0` |
-| iOS | 2.1.0 | [文件互传助手-iOS-2.1.0.ipa](文件互传助手-iOS-2.1.0.ipa) | 2.2 MB | `f05e37d5a3c324f8c3139ec09bbff0bd1cbe7889fd6d4115f9bb4f09d2bd3bf7` |
+| macOS | 2.2.0 | [文件互传助手-2.2.0.dmg](文件互传助手-2.2.0.dmg) | 3.4 MB | `c2e3bbc4a50b2d61ddba242e0d510532da61203841bfba1f0a4a3a04ccd30c86` |
+| Android | 2.2.0 | [文件互传助手-Android-2.2.0.apk](文件互传助手-Android-2.2.0.apk) | 42 MB | `69a6c2341dacb6d85f368ff92de4da9f7b99e41b8db536a43d1e82d43e05b588` |
+| iOS | 2.2.0 | [文件互传助手-iOS-2.2.0.ipa](文件互传助手-iOS-2.2.0.ipa) | 2.2 MB | `84a9122d811cc6c403d6ddb37fedfb9f84892456c723c67f12ffc45f0ec58d81` |
 | Windows | 2.1.0 | [文件互传助手-2.1.0-安装包.exe](文件互传助手-2.1.0-安装包.exe) | 28.1 MB | `a6ea8ae0e4bbf0c7e6b5905d52332ce2ba8bac83736d0ef5dfbd23654f10570c` |
 
-> 四端本轮统一为 **2.1.0**（macOS / Android / iOS / Windows）。
+> macOS / Android / iOS 本轮升级为 **2.2.0**；Windows 安装包仍是 **2.1.0**（本轮未重新打包）。
 > **iOS ipa 未签名**，需要用自己的 Apple Developer Team 重签后才能装真机；
 > **Android apk 为 debug 签名**，可直接侧载安装。Windows 安装包由
 > `windows/build-release.ps1` 生成（内置 .NET 8 运行时，目标机器无需安装 .NET）。
 > 校验值也可在 [SHA256SUMS.txt](SHA256SUMS.txt) 里查到。
+> 更新内容见 [docs/release-notes-2.2.0.md](../docs/release-notes-2.2.0.md)。
 
 ## macOS 安装
 
@@ -25,8 +26,8 @@
 
 ## Android 安装
 
-1. 下载 `文件互传助手-Android-2.1.0.apk`。
-2. 用 USB 线安装：`adb install -r 文件互传助手-Android-2.1.0.apk`；或把 APK 传到手机，
+1. 下载 `文件互传助手-Android-2.2.0.apk`。
+2. 用 USB 线安装：`adb install -r 文件互传助手-Android-2.2.0.apk`；或把 APK 传到手机，
    在文件管理器里打开并允许「安装未知应用」。
 3. 首次打开需要允许「本地网络 / 附近设备」相关权限；收到的文件保存在
    `Download/文件互传助手/`，可在系统「文件管理 → 下载」里直接看到。
@@ -35,7 +36,7 @@
 
 ## iOS 安装
 
-1. 下载 `文件互传助手-iOS-2.1.0.ipa`。
+1. 下载 `文件互传助手-iOS-2.2.0.ipa`。
 2. **该 IPA 未签名，不能直接双击安装**。需要用自己的 Apple Developer Team 重签：
    在 Xcode 里打开 `mobile/ios/ADBTypeMobile.xcodeproj`，选择 Team 后 Archive / 导出 IPA；
    或用 `codesign` + 自己的 provisioning profile 重签。
