@@ -5,7 +5,7 @@ macOS 原生 SwiftUI 小工具（macOS 13+，无第三方依赖），包含两�
 1. **移动设备**：在 Mac 上输入内容直接打进手机当前输入框；也支持把文件传到手机。
 2. **电脑设备**：和同一局域网里的 macOS / Windows 电脑像微信一样聊天，互发文字和文件。
 
-Windows 端在 [`windows/`](../windows/)；移动端规划见 [`mobile/`](../mobile/)；
+Windows 端在 [`windows/`](../windows/)；Android / iOS 原生端在 [`mobile/`](../mobile/)；
 局域网协议见 [`docs/LAN-transfer-spec.md`](../docs/LAN-transfer-spec.md)。
 
 界面预览：

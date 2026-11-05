@@ -53,6 +53,22 @@ Windows 端使用 .NET 8 + Avalonia，界面与 macOS 端保持同一套交互�
 
 ![Windows 离线好友与重连](screenshots/win-pc2.jpg)
 
+### 2.4 Android / iOS 端
+
+Android（Kotlin + Compose）和 iOS（SwiftUI）原生 App 只做「电脑设备」：和同一 Wi-Fi 的
+macOS / Windows 发现、配对、收发文字和文件，不做 ADB / 手机输入 / 移动设备页。
+
+| Android 首页 | Android 聊天（缩略图） |
+| --- | --- |
+| ![Android 首页](screenshots/android-home.png) | ![Android 聊天](screenshots/android-chat-media.png) |
+
+| iOS 首页 | iOS 聊天（缩略图） |
+| --- | --- |
+| ![iOS 首页](screenshots/ios-home.png) | ![iOS 聊天](screenshots/ios-chat-media.png) |
+
+图片 / 视频消息显示 120×90 缩略图，点击可全屏预览 / 播放；接收文件保存在用户可直接访问的位置，
+详见 [`mobile/README.md`](../mobile/README.md)。
+
 ## 3. 功能全景
 
 | 能力 | 说明 |
@@ -67,8 +83,11 @@ Windows 端使用 .NET 8 + Avalonia，界面与 macOS 端保持同一套交互�
 | 消息右键菜单 | 文字「复制文字」；文件「查看 / 打开文件位置 / 打开接收目录」 |
 | 文件缺失标记 | 本地文件被删除后，文件名显示删除线并标注「文件已不存在」 |
 | 关闭不退出 | macOS 关闭按钮 = 最小化到 Dock；Windows 关闭 = 收进托盘 |
-| 手机输入 / 文件 | 通过 USB ADB 把文字注入手机输入框、把文件推进手机目录 |
-| 双端互通 | macOS 与 Windows 使用同一套协议和缓存格式，可混用 |
+| 手机输入 / 文件 | 通过 USB ADB 把文字注入手机输入框、把文件推进手机目录（仅 macOS / Windows） |
+| 手机 ↔ 电脑 | Android / iOS 原生 App 和 macOS / Windows 配对，双向收发文字、文件 |
+| 手机接收文件 | Android 存公共 `Download/文件互传助手/`；iOS 存「文件」App 的 `Documents/Downloads/`，图片 / 视频另存系统相册 |
+| 手机图片 / 视频 | 120×90 缩略图，点击全屏缩放 / AVKit 播放 |
+| 四端互通 | macOS / Windows / Android / iOS 使用同一套协议和缓存格式，可混用 |
 
 ## 4. 核心技术
 
@@ -86,7 +105,8 @@ Windows 端使用 .NET 8 + Avalonia，界面与 macOS 端保持同一套交互�
     Android 手机                                                Windows 本机
 ```
 
-两端各自运行「发现 + 传输」两个模块，不经过任何中转服务器：
+各端各自运行「发现 + 传输」两个模块，不经过任何中转服务器；Android / iOS 也直接和
+macOS / Windows 通信：
 
 - 没有账号体系，也就不存在「登录态过期 / 服务器宕机」；
 - 没有文件上传，文件字节只在两台设备之间流动；
@@ -211,7 +231,7 @@ Windows 端使用 .NET 8 + Avalonia，界面与 macOS 端保持同一套交互�
 - 顶部页签改为 macOS 风格居中胶囊，窗口使用 DWM 圆角（Windows 11）/区域圆角（Windows 10）；
 - NSIS 安装向导：可选安装目录（默认 `D:\Program Files\文件互传助手`）、
   桌面快捷方式、卸载；自包含发布，目标机不需要安装 .NET；
-- 在 macOS 上即可完成 Windows 端编译、冒烟测试和双端联调。
+- 在 macOS 上即可完成 Windows 端编译、冒烟测试和电脑端联调。
 
 ### 4.11 移动端：只做电脑互传
 

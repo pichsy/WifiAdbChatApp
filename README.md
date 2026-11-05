@@ -1,10 +1,12 @@
-# 文件互传助手 · 局域网互传（macOS / Windows / 移动端规划）
+# 文件互传助手 · 局域网互传（macOS / Windows / Android / iOS）
 
 一套局域网直连的小工具，按端分成独立目录，互不交叉：
 
 - **macOS 端**（[`macos/`](macos/)）：SwiftUI 原生 App。既能用 adb 把文字/文件送到手机，也能和电脑像微信一样聊天互传。
 - **Windows 端**（[`windows/`](windows/)）：Avalonia + .NET 8 桌面端，和 macOS 端同一套协议、同样的聊天界面。
-- **移动端**（[`mobile/`](mobile/)）：规划中，目前只有 README。
+- **Android / iOS 端**（[`mobile/`](mobile/)）：Kotlin + Compose / SwiftUI 原生 App，已实现；
+  只做「电脑设备」互传——和同一局域网的 macOS / Windows 发现、配对、收发文字和文件，
+  不做 ADB / 手机输入 / 移动设备页。
 
 电脑之间**直连传输，不经过服务器**：UDP 52730 发现设备，6 位配对码配对，之后用 TCP 收发
 文字和文件；聊天记录、配对关系本地持久化。macOS 端会把已配对设备记成好友常驻左侧列表，
@@ -123,7 +125,7 @@ cd mobile/ios && xcodegen generate             # 然后用 Xcode / xcodebuild �
 ## 文档
 
 - 产品能力、核心技术与实测数据：[`docs/product-and-tech.md`](docs/product-and-tech.md)
-- 局域网协议 + 双端界面规格：[`docs/LAN-transfer-spec.md`](docs/LAN-transfer-spec.md)
+- 局域网协议 + 四端界面/存储规格：[`docs/LAN-transfer-spec.md`](docs/LAN-transfer-spec.md)
 - macOS 端构建、打包、使用、限制：[`macos/README.md`](macos/README.md)
 - Windows 端构建、使用、防火墙：[`windows/README.md`](windows/README.md)
 - Windows 真机测试清单：[`windows/TESTING.md`](windows/TESTING.md)
