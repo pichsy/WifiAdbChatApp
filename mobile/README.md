@@ -5,7 +5,7 @@
 > 不做 ADB、USB 调试、手机输入、移动设备页。
 >
 > 当前版本：**2.2.0**（Android / iOS）。发布包见仓库 [`release/`](../release/)：
-> `文件互传助手-Android-2.2.0.apk`（debug 签名）、`文件互传助手-iOS-2.2.0.ipa`（未签名，需自行重签）。
+> `文件互传助手-Android-2.2.0.apk`（release key 签名）、`文件互传助手-iOS-2.2.0.ipa`（未签名，需自行重签）。
 
 ## 截图
 

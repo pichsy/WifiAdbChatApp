@@ -1,4 +1,4 @@
 c2e3bbc4a50b2d61ddba242e0d510532da61203841bfba1f0a4a3a04ccd30c86  文件互传助手-2.2.0.dmg
-69a6c2341dacb6d85f368ff92de4da9f7b99e41b8db536a43d1e82d43e05b588  文件互传助手-Android-2.2.0.apk
+0bcbeccbe83978f1ec2ba4532f10d6d2932da8b3cd1f3f43ce158099d8e470eb  文件互传助手-Android-2.2.0.apk
 84a9122d811cc6c403d6ddb37fedfb9f84892456c723c67f12ffc45f0ec58d81  文件互传助手-iOS-2.2.0.ipa
 60ce64db9c6c253c7e398d683ea5dbfeee34f75a060e7da2ded513549b832ac2  文件互传助手-2.2.0-安装包.exe

@@ -33,7 +33,8 @@
 
 - 版本号同步到 2.2.0（versionCode 13）；
 - 接收文件保存在公共 `Download/文件互传助手/`，图片/视频消息有 120×90 缩略图和全屏预览；
-- APK 为 debug 签名，可直接侧载；正式分发请换 release keystore。
+- APK 已用项目 release key 签名，可直接侧载；与之前 debug 签名版本不兼容，首次安装需先卸载旧版。
+- keystore / 密码保留在本地 `mobile/android/keystore/`，不提交仓库；后续升级请继续使用同一密钥。
 
 ## iOS
 
@@ -55,10 +56,10 @@
 | --- | --- |
 | 文件互传助手-2.2.0.dmg | `c2e3bbc4a50b2d61ddba242e0d510532da61203841bfba1f0a4a3a04ccd30c86` |
 | 文件互传助手-2.2.0-安装包.exe | `60ce64db9c6c253c7e398d683ea5dbfeee34f75a060e7da2ded513549b832ac2` |
-| 文件互传助手-Android-2.2.0.apk | `69a6c2341dacb6d85f368ff92de4da9f7b99e41b8db536a43d1e82d43e05b588` |
+| 文件互传助手-Android-2.2.0.apk | `0bcbeccbe83978f1ec2ba4532f10d6d2932da8b3cd1f3f43ce158099d8e470eb` |
 | 文件互传助手-iOS-2.2.0.ipa | `84a9122d811cc6c403d6ddb37fedfb9f84892456c723c67f12ffc45f0ec58d81` |
 
-Windows / macOS / iOS 均未做代码签名 / 公证（Android 为 debug 签名），首次打开可能被
+Windows / macOS / iOS 均未做代码签名 / 公证（Android 为项目 release key 签名），首次打开可能被
 SmartScreen / Gatekeeper 拦截，按 [安装说明](../release/安装说明.md) 放行或重新签名。
 
 校验值也可在 [`release/SHA256SUMS.txt`](../release/SHA256SUMS.txt) 里查到。

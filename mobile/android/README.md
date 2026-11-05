@@ -109,6 +109,27 @@ mobile/android/app/build/reports/tests/testDebugUnitTest/index.html
 
 ---
 
+## APK 签名
+
+2.2.0 的 release APK 已用本项目的 release key 重新签名：
+
+- keystore：`mobile/android/keystore/adbtype-release.keystore`（本地文件，**不提交仓库**）
+- alias：`adbtype`
+- 密码：同目录 `credentials.txt`（权限 600，不提交仓库）
+- 证书 SHA-256：`710a0df5cf33e705b15ee652496a0f32d2513b2120acba8537e0285a8aaa2496`
+
+注意：这个 release key 与旧的 Android Debug 签名不同，**不能直接覆盖安装旧 debug 版**。
+如果手机上装过旧版，需要先卸载（会清掉 App 数据），再安装签名 APK：
+
+```bash
+adb uninstall dev.local.adbtype.mobile
+adb install -r 文件互传助手-Android-2.2.0.apk
+```
+
+后续升级必须继续使用同一份 keystore，请自行备份 `mobile/android/keystore/`。
+
+---
+
 ## 使用
 
 1. 手机和电脑连同一 Wi-Fi / 局域网；

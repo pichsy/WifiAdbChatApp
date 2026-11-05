@@ -21,6 +21,8 @@ windows/dist/
 
 # Android 构建产物 / 本机配置
 mobile/android/.gradle/
+# 本地签名密钥与密码（绝不提交）
+mobile/android/keystore/
 mobile/android/**/build/
 mobile/android/local.properties
 mobile/android/.idea/

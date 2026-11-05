@@ -142,9 +142,10 @@ cd mobile/ios && xcodegen generate             # 然后用 Xcode / xcodebuild �
 - 历史版本与 SHA-256 见 [`release/README.md`](release/README.md)。
 
 **Android 直接下载**：[`release/文件互传助手-Android-2.2.0.apk`](release/文件互传助手-Android-2.2.0.apk)
-（42 MB，Android 8.0+，debug 签名）
+（42 MB，Android 8.0+，release key 签名）
 
 - 传 APK 到手机安装，或 `adb install -r 文件互传助手-Android-2.2.0.apk`；
+- 已用项目 release key 签名；如果装过旧 debug 版，先 `adb uninstall dev.local.adbtype.mobile` 再安装；
 - 收到文件在公共 `Download/文件互传助手/`，图片/视频有缩略图和全屏预览；
 
 **iOS 直接下载**：[`release/文件互传助手-iOS-2.2.0.ipa`](release/文件互传助手-iOS-2.2.0.ipa)
