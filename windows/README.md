@@ -1,5 +1,12 @@
 # 文件互传助手 · Windows 端（Avalonia）
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Windows-2.2.0-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Windows 2.2.0" />
+  <img src="https://img.shields.io/badge/local--first-no%20server-5B9BFF?style=for-the-badge" alt="local-first" />
+</p>
+
+> **导航**：[文档中心](../docs/README.md) · [产品与技术](../docs/product-and-tech.md) · [协议规格](../docs/LAN-transfer-spec.md)
+
 Windows 端的「文件互传助手」局域网传输应用：和 macOS 端（`macos/Sources/LANTransfer.swift`）按
 [`docs/LAN-transfer-spec.md`](../docs/LAN-transfer-spec.md) 的协议**位对位互通**——互相发现、6 位配对码、
 收发文字和文件，界面是微信式的「左边设备列表 + 右边聊天 + 底部固定输入框」。

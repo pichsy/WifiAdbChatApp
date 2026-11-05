@@ -1,5 +1,7 @@
 # 文件互传助手 · iOS（SwiftUI）
 
+> **导航**：[文档中心](../../docs/README.md) · [移动端](../README.md) · [协议规格](../../docs/LAN-transfer-spec.md)
+
 同一 Wi-Fi 下与 macOS / Windows 版「文件互传助手」发现、配对、互发文字和文件的
 **原生 iOS App**。只做「电脑设备」功能：设备列表 + 聊天窗口；不包含 ADB、手机输入、
 移动设备页（这些是电脑端功能）。

@@ -3,6 +3,23 @@
 本文档是 macOS 端（SwiftUI，`macos/Sources/LANTransfer.swift`）、Windows 端（Avalonia + .NET 8，`windows/`）以及 Android / iOS 端（`mobile/`）之间的**兼容契约**。
 四端必须严格按本文的发现、帧格式、握手、文件传输和持久化部分实现，才能互相发现、配对、收发。
 
+> **协议版本**：v1 · **框架**：UDP 发现 + TCP 长度前缀 JSON 帧 + 原始文件流 · **更新**：2026-11-05
+
+## 目录
+
+| 章节 | 内容 |
+| --- | --- |
+| [1. 总体](#1-总体) | 端口、编码、连接模型 |
+| [2. 设备发现](#2-设备发现udp) | UDP 广播 / 接收 / 离线 |
+| [3. TCP 帧格式](#3-tcp-帧格式) | 长度前缀、JSON 边界 |
+| [4. 连接与握手](#4-连接与握手) | hello / hello_ok / pair_required |
+| [5. 消息类型](#5-消息类型) | text / file / ok / bye / error |
+| [6. 文件传输](#6-文件传输) | 文件头、块大小、进度 |
+| [7. 超时与错误](#7-超时与错误) | 6s / 30s / 中文错误 |
+| [8. 本机状态持久化](#8-本机状态持久化) | paired / friends / chats |
+| [9. 界面规格](#9-界面规格) | 电脑双栏 UI + 移动端差异 |
+| [10. 验收清单](#10-验收清单) | 四端联调检查项 |
+
 ---
 
 ## 1. 总体
@@ -77,19 +94,21 @@
 
 ### 4.1 时序
 
-```
-发送方 client                                  接收方 server
-    |  TCP connect(peer.host, peer.port) 超时 6s   |
-    | ----------> hello {app,v,id,name,code?} ---> |
-    |                                             | 校验 / 配对判断
-    | <---- hello_ok {name,id} 或 pair_required ---|
-    |       或 error {message}                    |
-    |                                             |
-    | ----------> text {text} / file {name,size} ->|
-    |                                             |
-    | <--------------------------- ok ------------|
-    | ----------> bye --------------------------->|
-    |  close                                      |
+```mermaid
+sequenceDiagram
+    participant C as 发送端 client
+    participant S as 接收端 server
+    C->>S: TCP connect（超时 6s）
+    C->>S: hello {app,v,id,name,code?}
+    alt 已配对 / 配对码正确
+        S-->>C: hello_ok {name,id}
+    else 首次发送 / 码错误
+        S-->>C: pair_required / error
+    end
+    C->>S: text {text} 或 file {name,size}
+    S-->>C: ok
+    C->>S: bye
+    Note over C,S: close
 ```
 
 ### 4.2 hello（client → server）
@@ -203,7 +222,9 @@
 
 ---
 
-## 9. 界面规格（电脑端一致；移动端见 9.4）
+## 9. 界面规格
+
+> 本节描述电脑端（macOS / Windows）双栏界面；Android / iOS 的差异见 [9.4](#94-android--ios-移动端差异)。
 
 目标：像微信/文件传输助手一样的聊天窗口——**左边是设备列表，右边是聊天记录，输入框固定在底部**。
 

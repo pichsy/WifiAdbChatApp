@@ -1,187 +1,213 @@
-# 文件互传助手 · 局域网互传（macOS / Windows / Android / iOS）
+<div align="center">
 
-一套局域网直连的小工具，按端分成独立目录，互不交叉：
+<img src="docs/screenshots/hero-banner.png" alt="文件互传助手：同一局域网，四端像聊天一样互传" width="100%" />
 
-- **macOS 端**（[`macos/`](macos/)）：SwiftUI 原生 App。既能用 adb 把文字/文件送到手机，也能和电脑像微信一样聊天互传。
-- **Windows 端**（[`windows/`](windows/)）：Avalonia + .NET 8 桌面端，和 macOS 端同一套协议、同样的聊天界面。
-- **Android / iOS 端**（[`mobile/`](mobile/)）：Kotlin + Compose / SwiftUI 原生 App，已实现；
-  只做「电脑设备」互传——和同一局域网的 macOS / Windows 发现、配对、收发文字和文件，
-  不做 ADB / 手机输入 / 移动设备页。
+<br />
 
-电脑之间**直连传输，不经过服务器**：UDP 52730 发现设备，6 位配对码配对，之后用 TCP 收发
-文字和文件；聊天记录、配对关系本地持久化。macOS 端会把已配对设备记成好友常驻左侧列表，
-对方离线时保留并自动重连，也提供手动重连。
+<a href="https://github.com/pichsy/WifiAdbChatApp/releases/tag/v2.2.0">
+  <img src="https://img.shields.io/badge/release-v2.2.0-5B9BFF?style=for-the-badge&logo=github&logoColor=white" alt="Release v2.2.0" />
+</a>
+<img src="https://img.shields.io/badge/macOS-2.2.0-111111?style=for-the-badge&logo=apple&logoColor=white" alt="macOS 2.2.0" />
+<img src="https://img.shields.io/badge/Windows-2.2.0-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Windows 2.2.0" />
+<img src="https://img.shields.io/badge/Android-2.2.0-34A853?style=for-the-badge&logo=android&logoColor=white" alt="Android 2.2.0" />
+<img src="https://img.shields.io/badge/iOS-2.2.0-000000?style=for-the-badge&logo=apple&logoColor=white" alt="iOS 2.2.0" />
 
-> 改名说明：App 的显示名称统一为「文件互传助手」。内部 Bundle ID、可执行文件名和协议广播
-> 标识仍是 `ADBType` / `ADBTypeLink`，不影响与旧版本或其他端互传，已有配对和聊天记录继续有效。
+<h3>不登录 · 不传云 · 同一 Wi-Fi 直接互传</h3>
+
+<p>
+  macOS / Windows / Android / iOS 四端原生 App。<br />
+  自动发现、6 位配对码、像微信一样收发文字和文件；数据不经过服务器。
+</p>
+
+</div>
+
+> **一句话**：把「就在旁边，却要经过微信 / 网盘 / U 盘」的文字和文件，变成同一局域网内的直连传输。
+>
+> **适合**：办公室电脑互传、Mac ↔ 手机、Windows ↔ 手机、临时给同事发安装包、在没有外网的环境传文件。
+>
+> **不适合**：公网穿透、跨网络远距离传输、需要端到端加密的敏感数据。
 
 ---
 
-## 仓库结构
+## 🚀 为什么是它
 
+| 零服务器 | 四端原生 | 文件可控 |
+| --- | --- | --- |
+| UDP 52730 自动发现，TCP 直连；不登录、不上传云端、不需要公网。 | macOS（SwiftUI）、Windows（Avalonia）、Android（Compose）、iOS（SwiftUI），同一套协议和缓存。 | 进度百分比、取消、重名编号、半截文件清理；接收文件放在用户能直接找到的目录。 |
+
+| 断线自愈 | 每设备独立会话 | 手机也能直接收 |
+| --- | --- | --- |
+| 2 秒心跳 + 已知设备单播 + 自动重连；网络切换 / 睡眠唤醒后恢复。 | 按设备 ID 存 `chats/<设备ID>.json`，离线 / 重启后历史还在；清空只影响当前会话。 | Android 存公共「下载/文件互传助手」，iOS 存「文件」App 的 Downloads，图片 / 视频还可进相册。 |
+
+---
+
+## 🖥️ 平台与状态
+
+| 平台 | 版本 | 状态 | 安装包 |
+| --- | --- | --- | --- |
+| macOS 13+ | **2.2.0** | 电脑互传 + USB ADB 手机输入 / 文件 / 截屏 | [dmg](release/文件互传助手-2.2.0.dmg) |
+| Windows 10 1809+ / 11 x64 | **2.2.0** | 电脑互传 + 移动设备截屏；居中胶囊页签 + 圆角窗口 | [安装包](release/文件互传助手-2.2.0-安装包.exe) |
+| Android 8.0+（API 28） | **2.2.0** | 只做电脑互传；公共下载落盘 / 图片视频预览 | [APK](release/文件互传助手-Android-2.2.0.apk) |
+| iOS 17+ | **2.2.0** | 只做电脑互传；Files 可见 Downloads / 相册 / AVKit | [IPA](release/文件互传助手-iOS-2.2.0.ipa) |
+
+> Android / iOS 端**不做** ADB、USB 调试、手机输入、移动设备页——只和电脑互传。
+> iOS IPA 未签名；Android APK 已用项目 release key 签名。详见[下载说明](#-下载)。
+
+---
+
+## 📸 界面预览
+
+| macOS · 电脑设备 | Windows · 电脑设备 |
+| --- | --- |
+| ![macOS 电脑设备](docs/screenshots/macos-computer-dark.jpg) | ![Windows 电脑设备](docs/screenshots/win-pc.jpg) |
+
+| Android · 聊天缩略图 | iOS · 聊天缩略图 |
+| --- | --- |
+| ![Android 聊天](docs/screenshots/android-chat-media.png) | ![iOS 聊天](docs/screenshots/ios-chat-media.png) |
+
+Windows 端会保留离线好友并显示「连接中断，正在重连…」：[离线好友截图](docs/screenshots/win-pc2.jpg)。
+更多手机截图见 [Android README](mobile/android/README.md)、[iOS README](mobile/ios/README.md)。
+
+---
+
+## ✨ 核心能力
+
+| 能力 | 说明 |
+| --- | --- |
+| **发现 / 配对** | UDP 52730 广播 + 已知设备单播；6 位配对码，配对后持久化设备 ID。 |
+| **文字聊天** | 左收右发、时间、复制、自动滚底；中文 / emoji 正常。 |
+| **文件传输** | 多文件选择 / 拖拽 / 粘贴；256 KiB 分块流式传输，进度、取消、失败清理。 |
+| **手机接收位置** | Android 公共 `Download/文件互传助手/`；iOS `Documents/Downloads/`（Files App 可见）+ 图片 / 视频存相册。 |
+| **图片 / 视频** | 120×90 缩略图，点击全屏缩放 / 播放；Android 用 filepicker，iOS 用 AVKit。 |
+| **多设备会话** | 每设备独立缓存、好友列表、离线保留、别名、手动 / 自动重连。 |
+| **桌面增强** | macOS 关闭 = 最小化到 Dock；Windows 关闭 = 收进托盘；Windows 移动设备页支持 ADB 截屏。 |
+| **错误处理** | 连接 6s / 读写 30s 超时；对端退出、Wi-Fi 断开、端口占用都有中文提示，不崩溃。 |
+
+---
+
+## 🧠 架构
+
+```mermaid
+flowchart LR
+    M[macOS<br/>SwiftUI] <-->|UDP 52730 + TCP| W[Windows<br/>Avalonia]
+    M <-->|UDP 52730 + TCP| A[Android<br/>Compose]
+    M <-->|UDP 52730 + TCP| I[iOS<br/>SwiftUI]
+    W <-->|UDP 52730 + TCP| A
+    W <-->|UDP 52730 + TCP| I
+    A <-->|UDP 52730 + TCP| I
 ```
+
+| 协议要点 | 值 |
+| --- | --- |
+| 发现 | UDP `52730`，2 秒广播 / 心跳，8 秒无心跳离线 |
+| 传输 | TCP 随机端口，4 字节大端长度 + UTF-8 JSON |
+| 单帧上限 | 16 MiB |
+| 文件块 | 256 KiB 原始字节流 |
+| 配对 | 6 位数字码，配对 ID 持久化 |
+| 超时 | 连接 6s，读写 30s |
+
+完整帧格式、握手、字段和验收清单见 [协议与界面规格](docs/LAN-transfer-spec.md)。
+
+---
+
+## ⚡ 快速开始
+
+| 平台 | 最短路径 |
+| --- | --- |
+| **macOS** | `cd macos && ./build.sh` → 打开 `文件互传助手.app` |
+| **Windows** | 运行 `release\文件互传助手-2.2.0-安装包.exe`，或 `windows\build.ps1` |
+| **Android** | `cd mobile/android && ./gradlew assembleDebug`，或直接安装 release APK |
+| **iOS** | `cd mobile/ios && xcodegen generate`，再用 Xcode / `xcodebuild` 构建 |
+
+使用前确认：
+
+1. 两台设备连**同一个 Wi-Fi / 局域网**；
+2. 电脑端允许「本地网络」（macOS）或防火墙「专用网络」（Windows）；
+3. 首次发送时，在对方屏幕上读出 6 位配对码并输入；
+4. 配对后直接在聊天里发文字 / 文件即可。
+
+各平台构建、权限、模拟器 / 真机步骤：
+[macOS](macos/README.md) · [Windows](windows/README.md) · [Android / iOS](mobile/README.md) · [协议测试](mobile/tests/README.md)
+
+---
+
+## 📦 下载
+
+| 平台 | 文件 | 大小 | 说明 |
+| --- | --- | --- | --- |
+| macOS | [文件互传助手-2.2.0.dmg](release/文件互传助手-2.2.0.dmg) | 3.4 MB | 通用二进制（Apple 芯片 / Intel），未公证 |
+| Windows | [文件互传助手-2.2.0-安装包.exe](release/文件互传助手-2.2.0-安装包.exe) | 28.1 MB | 自包含 .NET 8，安装向导 |
+| Android | [文件互传助手-Android-2.2.0.apk](release/文件互传助手-Android-2.2.0.apk) | 42 MB | release key 签名，可直接侧载 |
+| iOS | [文件互传助手-iOS-2.2.0.ipa](release/文件互传助手-iOS-2.2.0.ipa) | 2.2 MB | 未签名，需自己的 Team 重签 |
+
+- 校验值：[`release/SHA256SUMS.txt`](release/SHA256SUMS.txt) · 安装细节：[`release/README.md`](release/README.md)
+- GitHub Release：[v2.2.0](https://github.com/pichsy/WifiAdbChatApp/releases/tag/v2.2.0)（附件名因 GitHub 限制使用 ASCII）
+- Android 如果装过旧 debug 签名版，需先 `adb uninstall dev.local.adbtype.mobile` 再安装新签名 APK。
+- iOS 首次运行需允许「本地网络」；图片 / 视频首次保存到相册会询问「仅添加照片」。
+
+---
+
+## 📚 文档地图
+
+| 想了解 | 文档 |
+| --- | --- |
+| 5 分钟了解项目 / 选平台 | [文档中心](docs/README.md) |
+| 产品能力、架构、实测数据 | [产品与技术](docs/product-and-tech.md) |
+| 帧格式、握手、字段、验收 | [协议与界面规格](docs/LAN-transfer-spec.md) |
+| macOS 构建 / 打包 / 限制 | [macOS README](macos/README.md) |
+| Windows 构建 / 安装 / 防火墙 | [Windows README](windows/README.md) |
+| Android / iOS 构建 / 权限 / 存储 | [移动端 README](mobile/README.md) |
+| 协议参考对端 / 回归测试 | [mobile/tests](mobile/tests/README.md) |
+| 2.2.0 更新内容 | [发布说明](docs/release-notes-2.2.0.md) |
+
+---
+
+## 🔒 安全与边界
+
+- 局域网直连是**明文 TCP**，没有加密 / 身份校验，仅适合可信家庭、办公室或热点网络。
+- 公司 / 酒店 Wi-Fi 常有 AP 隔离；两端互相搜不到时，换手机热点再试。
+- iOS 进入后台会被系统挂起，接收消息需保持前台；Android 无前台服务，长时间后台可能收不到。
+- macOS 未签名 / 未公证；Windows 安装包未做代码签名；iOS IPA 未签名。首次打开可能被系统安全提示拦截，按各端 README 放行。
+- 公网穿透、跨网络、端到端加密不在本项目范围内。
+
+---
+
+## 🗂️ 仓库结构
+
+<details>
+<summary>展开目录</summary>
+
+```text
 .
-├─ macos/                 macOS 端（源码、图标、打包脚本、联调工具）
-│  ├─ Sources/            SwiftUI App 源码
-│  ├─ Resources/          Info.plist、图标、手机剪贴板 dex
-│  ├─ packaging/          分发用安装说明与安装脚本
-│  ├─ tests/              协议探针 / 界面离屏渲染 / 互通测试
-│  ├─ build.sh            编译出「文件互传助手.app」
-│  └─ package.sh          生成 dmg / zip
+├─ macos/                 macOS 端（SwiftUI + AppKit）
 ├─ windows/               Windows 端（Avalonia + .NET 8）
-│  ├─ src/                Core、App、SmokeTest、TestPeer
-│  ├─ installer/          NSIS 安装包脚本（带安装向导 + 桌面快捷方式）
-│  ├─ build.ps1           构建 + 发布
-│  ├─ build-release.ps1   生成 release/ 下的安装包
-│  └─ README.md           构建、使用、防火墙说明
-├─ release/               正式发布包（macOS dmg + Windows 安装包）
-├─ mobile/                移动端（Android / iOS 原生 App，只做电脑互传）
+├─ mobile/
+│  ├─ android/            Android（Kotlin + Compose）
+│  ├─ ios/                iOS（SwiftUI）
+│  ├─ tests/              Python 协议参考对端 + 回归测试
+│  └─ README.md
+├─ release/               正式安装包 + SHA256SUMS
 ├─ docs/
-│  ├─ product-and-tech.md    产品能力、核心技术与实测数据
-│  ├─ LAN-transfer-spec.md   三端共用的协议 + 界面规格
-│  └─ screenshots/           界面预览图
+│  ├─ README.md           文档中心
+│  ├─ product-and-tech.md 产品 / 架构 / 实测
+│  ├─ LAN-transfer-spec.md 协议 + 界面规格
+│  └─ screenshots/        界面截图
 ├─ README.md
 └─ .gitignore
 ```
 
-## 各端状态
+</details>
 
-| 端 | 状态 | 说明 |
-| --- | --- | --- |
-| macOS | ✅ 可运行 | 手机输入 / 手机文件传输 / 手机截屏 / 电脑聊天互传；已配对好友列表 + 别名 + 每设备独立会话 + 自动/手动重连 + 发送进度/取消 + 消息右键菜单/文件缺失删除线/关闭按钮最小化；已打包 2.2.0（dmg + zip） |
-| Windows | ✅ 代码完成，安装包可用 | macOS 上编译 0 warning、冒烟测试 37/37 + 9/9、与 macOS 端双向真实收发通过；Windows 真机上安装 / 桌面快捷方式 / 卸载已验证；关闭窗口收进托盘，后台继续收发；「移动设备」页支持 adb 截屏（可缩放预览、1:1、存到下载目录）；顶部居中胶囊页签 + 圆角窗口 |
-| Android | ✅ 原生已实现 | Kotlin + Compose，minSdk 28；只做电脑互传；公开 Downloads 落盘 + 图片/视频缩略图/filepicker 预览；HUAWEI 真机联调通过 |
-| iOS | ✅ 原生已实现 | SwiftUI，iOS 17+；只做电脑互传；Documents/Downloads + 系统相册；缩略图/AVKit 播放；iPhone 17 模拟器 49 tests + UI 测试通过（真机需签名） |
+> 改名说明：App 显示名统一为「文件互传助手」；内部 Bundle ID、可执行文件名和协议广播标识仍是 `ADBType` / `ADBTypeLink`，旧版本配对和聊天记录继续有效。
 
-## 界面预览
+---
 
-**macOS**
+<div align="center">
 
-| 电脑设备 | 移动设备 |
-| --- | --- |
-| ![macOS 电脑设备](docs/screenshots/macos-computer-dark.jpg) | ![macOS 移动设备](docs/screenshots/macos-mobile-dark.jpg) |
+**如果这个项目帮你省下了几次微信传文件，欢迎 Star ⭐**
 
-**Windows**
+[GitHub](https://github.com/pichsy/WifiAdbChatApp) · [Gitee](https://gitee.com/pichs/WifiAdbChatApp) · [Releases](https://github.com/pichsy/WifiAdbChatApp/releases)
 
-| 电脑设备 | 移动设备 |
-| --- | --- |
-| ![Windows 电脑设备](docs/screenshots/win-pc.jpg) | ![Windows 移动设备](docs/screenshots/win-home.jpg) |
+<sub>最后更新：2026-11-05 · v2.2.0</sub>
 
-Windows 端同样会保留离线好友，并在状态栏显示「连接中断，正在重连…」：[离线好友截图](docs/screenshots/win-pc2.jpg)。
-
-**Android / iOS**
-
-| Android 首页 | Android 聊天（缩略图） |
-| --- | --- |
-| ![Android 首页](docs/screenshots/android-home.png) | ![Android 聊天](docs/screenshots/android-chat-media.png) |
-
-| iOS 首页 | iOS 聊天（缩略图） |
-| --- | --- |
-| ![iOS 首页](docs/screenshots/ios-home.png) | ![iOS 聊天](docs/screenshots/ios-chat-media.png) |
-
-## 核心技术与亮点
-
-- **零服务器直连**：UDP 52730 自动发现，TCP 随机端口直接传文件；不登录、不上传云端、不需要公网。
-- **自研轻量协议**：4 字节大端长度 + UTF-8 JSON 帧，支持 `hello / pair_required / text / file / ok / bye`，单帧上限 16 MiB，文件按 256 KiB 原始字节流式传输。
-- **断线自愈**：2 秒心跳 + 已知设备单播 + 自动重连；设备掉线先标「离线 · 正在重连」，好友列表和聊天记录不消失；网络切换 / 睡眠唤醒自动恢复。
-- **每设备独立会话**：按设备 ID 存 `chats/<设备ID>.json`，选中谁只显示谁；离线、重启后历史仍在；旧版单文件记录自动合并迁移。
-- **文件传输可控**：进度百分比、X 取消、失败清理半截文件、重名自动编号；文件丢失显示删除线，右键可打开接收目录。
-- **三端原生**：macOS 用 SwiftUI + AppKit 通用二进制；Windows 用 .NET 8 + Avalonia 自包含安装包；Android 用 Kotlin + Compose；iOS 用 SwiftUI + AVKit；同协议、同缓存格式，可混用。
-- **移动端存储与预览**：Android 接收文件落公共 `Download/文件互传助手/`；iOS 落「文件」App 可见的 `Documents/Downloads/` 并支持存入相册；图片/视频 120×90 缩略图，点击放大 / 播放（Android 使用 filepicker 弹窗）。
-- **手机直达**：USB ADB 注入中文 / ASCII 文字，文件直接推进 `/sdcard/Download`。
-
-完整架构、核心技术和实测数据：[docs/product-and-tech.md](docs/product-and-tech.md)。
-
-## 快速开始
-
-**macOS**
-
-```bash
-cd macos
-./build.sh          # 需要 Xcode 命令行工具；默认 arm64 + x86_64
-open 文件互传助手.app
-```
-
-**Windows**
-
-直接运行已打包好的安装程序：
-
-```
-release\文件互传助手-2.2.0-安装包.exe
-```
-
-安装向导最后一页默认勾选「创建桌面快捷方式」，完成后桌面 / 开始菜单即可启动。
-从源码构建 / 重新打包见 [`windows/README.md`](windows/README.md)。
-
-**Android / iOS**
-
-```bash
-cd mobile/android && ./gradlew assembleDebug   # APK: app/build/outputs/apk/debug/app-debug.apk
-cd mobile/ios && xcodegen generate             # 然后用 Xcode / xcodebuild 构建
-```
-
-详细依赖、权限、模拟器/真机步骤见 [`mobile/README.md`](mobile/README.md)。
-
-## 文档
-
-- 产品能力、核心技术与实测数据：[`docs/product-and-tech.md`](docs/product-and-tech.md)
-- 局域网协议 + 四端界面/存储规格：[`docs/LAN-transfer-spec.md`](docs/LAN-transfer-spec.md)
-- macOS 端构建、打包、使用、限制：[`macos/README.md`](macos/README.md)
-- Windows 端构建、使用、防火墙：[`windows/README.md`](windows/README.md)
-- Windows 真机测试清单：[`windows/TESTING.md`](windows/TESTING.md)
-- macOS 联调工具（探针 / Python 对端 / 互通脚本）：[`macos/tests/README.md`](macos/tests/README.md)
-- Android / iOS 原生 App：[`mobile/README.md`](mobile/README.md)
-- 协议参考对端 / 回归测试：[`mobile/tests/README.md`](mobile/tests/README.md)
-- 2.2.0 发布说明：[`docs/release-notes-2.2.0.md`](docs/release-notes-2.2.0.md)
-
-## 下载与安装包
-
-**macOS 直接下载**：[`release/文件互传助手-2.2.0.dmg`](release/文件互传助手-2.2.0.dmg)
-（3.4 MB，macOS 13+，Apple 芯片 / Intel 通用）
-
-- 双击 dmg，把「文件互传助手.app」拖进「应用程序」覆盖旧版即可；
-- 未签名 / 未公证，首次打开如被拦：右键「打开」，或执行 dmg 里的 `授权并安装.sh`；
-- 历史版本与 SHA-256 见 [`release/README.md`](release/README.md)。
-
-**Android 直接下载**：[`release/文件互传助手-Android-2.2.0.apk`](release/文件互传助手-Android-2.2.0.apk)
-（42 MB，Android 8.0+，release key 签名）
-
-- 传 APK 到手机安装，或 `adb install -r 文件互传助手-Android-2.2.0.apk`；
-- 已用项目 release key 签名；如果装过旧 debug 版，先 `adb uninstall dev.local.adbtype.mobile` 再安装；
-- 收到文件在公共 `Download/文件互传助手/`，图片/视频有缩略图和全屏预览；
-
-**iOS 直接下载**：[`release/文件互传助手-iOS-2.2.0.ipa`](release/文件互传助手-iOS-2.2.0.ipa)
-（2.2 MB，iOS 17+，**未签名**）
-
-- 未签名 IPA 不能直接安装，需要自己的 Apple Developer Team 用 Xcode 重签；
-- 收到文件在「文件」App › 我的 iPhone › 文件互传助手 › Downloads，图片/视频另存相册；
-
-**Windows 直接下载**：[`release/文件互传助手-2.2.0-安装包.exe`](release/文件互传助手-2.2.0-安装包.exe)
-（28.1 MB，Windows 10 1809+ / 11 x64）
-
-- 带安装向导的安装程序，内置 .NET 运行时，目标机器无需安装 .NET；
-- 点右上角 ✕ 只是把窗口收进**托盘**，后台继续收发；左键托盘图标恢复窗口，右键菜单可退出；
-- 安装位置由你在向导里选择（默认 `D:\Program Files\文件互传助手`，向导里随时可以改），
-  主程序、原生库、图标、卸载程序全部放在这个目录里，运行时直接从这里启动，<br>
-  不会再往 `C:\...\Temp` 解压程序文件；
-- **安装向导最后一页有「创建桌面快捷方式」勾选项，默认勾选**；点「完成」时才创建桌面快捷方式，
-  取消勾选则只建开始菜单项；
-- 聊天记录、配对信息和接收到的文件仍保存在用户数据目录（`%APPDATA%\ADBTypeLink` 等），不受安装位置影响；
-- 安装 / 卸载 / 静默安装 / 防火墙说明见 [`release/安装说明.md`](release/安装说明.md)。
-
-macOS 的构建产物仍由 `macos/package.sh` 生成在 `macos/dist/`（不进 git）；正式发布包放在 `release/`。
-Windows 的自包含 exe 由 `windows/build-release.ps1` 生成到 `release/`（中间产物 `windows/publish/` 不进 git）：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File windows\build-release.ps1
-```
-
-仅重新生成安装包（复用已发布的 exe）：加 `-SkipBuild`。
-
-## 已知限制
-
-- 局域网传输是明文直连，没有加密，仅适合可信的家庭 / 办公网络。
-- 公司 / 酒店 Wi-Fi 常有 AP 隔离，两端互相搜不到时换手机热点再试。
-- macOS 首次使用「电脑设备」页需要允许「本地网络」权限；Windows 首次运行需要放行防火墙的专用网络。
-- Windows 安装包（安装 / 桌面快捷方式 / 静默安装 / 卸载）已在真实 Windows 机器上验证；应用界面细节、
-  防火墙放行和双机互传仍建议按 [`windows/TESTING.md`](windows/TESTING.md) 点一遍。
+</div>

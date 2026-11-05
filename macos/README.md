@@ -1,5 +1,12 @@
 # 文件互传助手 · macOS 端
 
+<p align="center">
+  <img src="https://img.shields.io/badge/macOS-2.2.0-111111?style=for-the-badge&logo=apple&logoColor=white" alt="macOS 2.2.0" />
+  <img src="https://img.shields.io/badge/local--first-no%20server-5B9BFF?style=for-the-badge" alt="local-first" />
+</p>
+
+> **导航**：[文档中心](../docs/README.md) · [产品与技术](../docs/product-and-tech.md) · [协议规格](../docs/LAN-transfer-spec.md)
+
 macOS 原生 SwiftUI 小工具（macOS 13+，无第三方依赖），包含两个页面：
 
 1. **移动设备**：在 Mac 上输入内容直接打进手机当前输入框；也支持把文件传到手机。
@@ -173,9 +180,9 @@ adb -s <serial> shell input keyevent 66              # 回车
 
 ## 更新记录
 
-- **2.2.0**：macOS / Android / iOS 三端版本号同步到 2.2.0；macOS 功能与 2.1.0 一致
+- **2.2.0**：macOS / Windows / Android / iOS 四端版本号统一到 2.2.0；macOS 功能与 2.1.0 一致
   （移动设备截屏、可缩放窗口、1:1/缩放百分比已包含），重新出 dmg 安装包。
-- **2.1.0**：三端版本号统一（macOS / Android / iOS）；macOS「移动设备」页新增**截屏**：
+- **2.1.0**：macOS / Android / iOS 三端先统一到 2.1.0，Windows 随后同版；macOS「移动设备」页新增**截屏**：
   设备卡片点「截屏」抓取手机当前屏幕，弹窗预览；支持刷新、保存、选择保存目录（默认系统「下载」）、
   保存 toast、捏合缩放/拖拽平移、双击缩放、1:1 恢复适应窗口和缩放百分比显示。
 - **2.0.1**：窗口红色关闭按钮改为「最小化到 Dock」，不再关掉窗口/退出进程；点 Dock 图标或

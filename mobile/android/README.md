@@ -1,5 +1,7 @@
 # 文件互传助手 · Android 端
 
+> **导航**：[文档中心](../../docs/README.md) · [移动端](../README.md) · [协议规格](../../docs/LAN-transfer-spec.md)
+
 Android 原生 App（Kotlin + Jetpack Compose），只做「电脑设备」功能：
 在同一 Wi-Fi / 局域网里发现 macOS / Windows 版「文件互传助手」，用 6 位配对码配对后，
 像微信一样收发文字和文件。

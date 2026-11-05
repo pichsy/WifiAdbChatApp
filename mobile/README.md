@@ -1,5 +1,12 @@
 # 文件互传助手 · 移动端（Android / iOS）
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Android-2.2.0-34A853?style=for-the-badge&logo=android&logoColor=white" alt="Android 2.2.0" />
+  <img src="https://img.shields.io/badge/iOS-2.2.0-000000?style=for-the-badge&logo=apple&logoColor=white" alt="iOS 2.2.0" />
+</p>
+
+> **导航**：[文档中心](../docs/README.md) · [产品与技术](../docs/product-and-tech.md) · [协议规格](../docs/LAN-transfer-spec.md)
+>
 > 已实现：Android（Kotlin + Jetpack Compose，minSdk 28）与 iOS（SwiftUI，iOS 17+）原生 App。
 > 只做「电脑设备」功能：和同一 Wi-Fi 下的 macOS / Windows 电脑发现、配对、互发文字和文件；
 > 不做 ADB、USB 调试、手机输入、移动设备页。
