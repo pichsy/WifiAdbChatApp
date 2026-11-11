@@ -420,11 +420,15 @@ struct DeviceFileBrowserView: View {
     @ViewBuilder
     private func rowContextMenu(_ entry: DeviceFileEntry) -> some View {
         let multipleSelected = model.selectedPaths.count > 1 && model.selectedPaths.contains(entry.path)
-        Menu("新建") {
-            Button("文件") { promptCreate(in: creationDirectory(for: entry), isDirectory: false) }
-            Button("文件夹") { promptCreate(in: creationDirectory(for: entry), isDirectory: true) }
+        if multipleSelected || model.isBusy {
+            Button("新建") {}
+                .disabled(true)
+        } else {
+            Menu("新建") {
+                Button("文件") { promptCreate(in: creationDirectory(for: entry), isDirectory: false) }
+                Button("文件夹") { promptCreate(in: creationDirectory(for: entry), isDirectory: true) }
+            }
         }
-        .disabled(multipleSelected || model.isBusy)
         Button("上传到当前目录…") { upload(to: model.path) }
             .disabled(multipleSelected || model.isBusy)
         Divider()
