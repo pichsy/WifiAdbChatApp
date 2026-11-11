@@ -446,6 +446,12 @@ struct DeviceFileBrowserView: View {
             showToast("已复制路径")
         }
         Divider()
+        Button {
+            model.refresh()
+        } label: {
+            Label("刷新", systemImage: "arrow.clockwise")
+        }
+        Divider()
         Button(role: .destructive) {
             confirmDelete(deleteTargets(for: entry))
         } label: {
