@@ -345,7 +345,9 @@ final class DeviceFileBrowserModel: ObservableObject {
 extension ADB {
     /// 列出手机目录。ls 的原始输出交给 DeviceFileParser，UI 不直接解析。
     static func listDirectory(adb: String, serial: String, path: String) -> (entries: [DeviceFileEntry]?, error: String?) {
-        let command = "ls -la " + shellQuote(path)
+        // 末尾必须带 /，否则 toybox ls 会把 /sdcard 这类符号链接本身列出来，而不是目录内容。
+        let listingPath = path == "/" ? "/" : (path.hasSuffix("/") ? path : path + "/")
+        let command = "ls -la " + shellQuote(listingPath)
         let result = run(adb, ["-s", serial, "shell", command], timeout: 25)
         guard result.ok else {
             return (nil, fileBrowserError(result, fallback: "无法读取 \(path)"))
