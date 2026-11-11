@@ -31,6 +31,9 @@
                   <Button Classes="link" Content="截屏" Click="OnMobileScreenshot"
                           IsEnabled="{Binding Mobile.HasDevices}"
                           ToolTip.Tip="截取手机当前屏幕" />
+                  <Button Classes="link" Content="文件" Click="OnMobileFiles"
+                          IsEnabled="{Binding Mobile.HasDevices}"
+                          ToolTip.Tip="浏览手机文件" />
                   <Button Classes="icon" Content="↻" Click="OnMobileRefresh"
                           ToolTip.Tip="刷新设备列表" />
                 </StackPanel>

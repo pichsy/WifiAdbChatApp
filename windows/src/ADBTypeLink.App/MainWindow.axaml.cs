@@ -825,6 +825,11 @@ public partial class MainWindow : Window
         ScreenshotWindow.Present(_viewModel.Mobile);
     }
 
+    private void OnMobileFiles(object? sender, RoutedEventArgs e)
+    {
+        FileBrowserWindow.Present(_viewModel.Mobile);
+    }
+
     private async void OnMobileRefresh(object? sender, RoutedEventArgs e)
     {
         try

@@ -1,7 +1,7 @@
 # 文件互传助手 · Windows 端（Avalonia）
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Windows-2.2.0-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Windows 2.2.0" />
+  <img src="https://img.shields.io/badge/Windows-2.3.0-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Windows 2.3.0" />
   <img src="https://img.shields.io/badge/local--first-no%20server-5B9BFF?style=for-the-badge" alt="local-first" />
 </p>
 
@@ -19,6 +19,9 @@ Windows 端的「文件互传助手」局域网传输应用：和 macOS 端（`m
   一点直接在资源管理器里定位最近保存的截屏（还没保存过就打开保存目录）。
 - 顶部「移动设备 / 电脑设备」改成 macOS 风格的居中胶囊页签；主窗口和截屏窗口在 Windows 11
   使用 DWM 圆角，Windows 10 自动退回圆角窗口区域。
+- 「移动设备」页新增 **文件** 文件浏览窗口，复刻 macOS 端：常用目录、路径跳转、精确路径定位、隐藏文件、
+  列表 / 网格切换、图片 / GIF / 视频缩略图、单选 / Ctrl / Shift 多选、右键新建 / 上传 / 刷新 / 复制路径 /
+  下载 / 批量删除、应用数据包名与 run-as 浏览；列表和网格卡片高度、文件名单行省略也与 macOS 对齐。
 
 界面预览：
 

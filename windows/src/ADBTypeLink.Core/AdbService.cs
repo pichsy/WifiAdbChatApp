@@ -448,6 +448,24 @@ public sealed class AdbService
             .ConfigureAwait(false);
     }
 
+    // MARK: - 文件拉取
+
+    /// <summary>从手机拉取文件 / 目录，进度 0~100。</summary>
+    public Task<AdbResult> PullAsync(
+        string serial,
+        string remotePath,
+        string localPath,
+        IProgress<double>? progress = null,
+        TimeSpan? timeout = null,
+        CancellationToken cancellationToken = default)
+    {
+        return RunAsync(
+            new[] { "-s", serial, "pull", "-p", remotePath, localPath },
+            timeout ?? TimeSpan.FromMinutes(10),
+            progress,
+            cancellationToken);
+    }
+
     /// <summary>把 adb 的原始报错翻成人话，对应 macOS 端的 <c>ADB.friendly</c>。</summary>
     public static string Friendly(string? raw, string fallback = "adb 执行失败")
     {

@@ -12,7 +12,8 @@
 | iOS | 2.2.0 | [文件互传助手-iOS-2.2.0.ipa](文件互传助手-iOS-2.2.0.ipa) | 2.2 MB | `84a9122d811cc6c403d6ddb37fedfb9f84892456c723c67f12ffc45f0ec58d81` |
 | Windows | 2.2.0 | [文件互传助手-2.2.0-安装包.exe](文件互传助手-2.2.0-安装包.exe) | 28.1 MB | `60ce64db9c6c253c7e398d683ea5dbfeee34f75a060e7da2ded513549b832ac2` |
 
-> 当前 macOS 为 **2.3.0**；Windows / Android / iOS 仍为 **2.2.0**（上一轮四端统一版本）。
+> 当前 macOS / Windows 源码为 **2.3.0**；Windows 安装包仍为 2.2.0，需重新运行 build-release.ps1；
+> Android / iOS 仍为 **2.2.0**。
 > **iOS ipa 未签名**，需要用自己的 Apple Developer Team 重签后才能装真机；
 > **Android apk 已用项目 release key 签名**，可直接侧载安装；与之前的 debug 签名版本不兼容，
 > 首次安装需先卸载旧版。Windows 安装包由

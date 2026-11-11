@@ -5,7 +5,7 @@
 <h1>📚 文档中心</h1>
 
 <p>
-  文件互传助手 <b>macOS v2.3.0</b> · Windows / Android / iOS v2.2.0<br />
+  文件互传助手 <b>macOS / Windows v2.3.0</b> · Android / iOS v2.2.0<br />
   从「怎么装」到「协议怎么实现」，按需进入。
 </p>
 
@@ -45,7 +45,7 @@
 | 平台 | 最低系统 | 版本 | 适合 |
 | --- | --- | --- | --- |
 | macOS | 13+ | 2.3.0 | 电脑互传 + USB ADB 手机输入 / 文件 / 截屏；文件窗口支持列表/网格 |
-| Windows | 10 1809+ / 11 x64 | 2.2.0 | 电脑互传 + 移动设备截屏；胶囊页签 / 圆角窗口 |
+| Windows | 10 1809+ / 11 x64 | 2.3.0 | 电脑互传 + 移动设备截屏 + 手机文件管理；胶囊页签 / 圆角窗口 |
 | Android | 8.0+ | 2.2.0 | 只做电脑互传；公共下载 / 图片视频预览 |
 | iOS | 17+ | 2.2.0 | 只做电脑互传；Files Downloads / 相册 / AVKit |
 
@@ -99,7 +99,7 @@ Android APK 已用项目 release key 签名；iOS IPA 未签名，需要自己�
 
 ## 🏷️ 版本与更新
 
-- 当前版本：**macOS v2.3.0**；Windows / Android / iOS **v2.2.0**
+- 当前版本：**macOS / Windows v2.3.0**；Android / iOS **v2.2.0**
 - 发布标签：[v2.2.0](https://github.com/pichsy/WifiAdbChatApp/releases/tag/v2.2.0)（macOS 2.3.0 为本次仓库包）
 - 更新记录：[2.3.0 发布说明](release-notes-2.3.0.md)
 - 代码仓库：[GitHub](https://github.com/pichsy/WifiAdbChatApp) · [Gitee](https://gitee.com/pichs/WifiAdbChatApp)
