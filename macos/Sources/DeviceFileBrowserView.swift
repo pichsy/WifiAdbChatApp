@@ -7,6 +7,7 @@ struct DeviceFileBrowserView: View {
     @State private var pathDraft: String
     @State private var toastMessage: String?
     @State private var toastWork: DispatchWorkItem?
+    @State private var gridAnchorPath: String?
 
     init(adbPath: String, device: ADBDevice) {
         _model = StateObject(wrappedValue: DeviceFileBrowserModel(adbPath: adbPath,
@@ -230,8 +231,10 @@ struct DeviceFileBrowserView: View {
         VStack(spacing: 0) {
             pathBar
             Divider()
-            columnHeader
-            Divider()
+            if !model.isGrid {
+                columnHeader
+                Divider()
+            }
 
             ZStack {
                 if model.isLoading && model.entries.isEmpty {
@@ -263,6 +266,8 @@ struct DeviceFileBrowserView: View {
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
+                } else if model.isGrid {
+                    fileGrid
                 } else {
                     List(selection: $model.selectedPaths) {
                         ForEach(Array(model.visibleEntries.enumerated()), id: \.element.id) { index, entry in
@@ -329,6 +334,15 @@ struct DeviceFileBrowserView: View {
             .controlSize(.small)
             .disabled(pathDraft == model.path)
 
+            Button {
+                model.isGrid.toggle()
+            } label: {
+                Image(systemName: model.isGrid ? "list.bullet" : "square.grid.2x2")
+            }
+            .buttonStyle(.borderless)
+            .help(model.isGrid ? "切换为列表" : "切换为网格")
+            .accessibilityLabel(model.isGrid ? "切换为列表" : "切换为网格")
+
             Spacer(minLength: 4)
 
             if model.isBusy {
@@ -361,6 +375,118 @@ struct DeviceFileBrowserView: View {
         .foregroundStyle(.secondary)
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
+    }
+
+
+    private var fileGrid: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 0) {
+                    Color.clear
+                        .frame(height: 0)
+                        .id("grid-top")
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 118, maximum: 160), spacing: 14)],
+                              alignment: .leading,
+                              spacing: 14) {
+                        ForEach(model.visibleEntries) { entry in
+                            gridCell(entry)
+                        }
+                    }
+                    .padding(14)
+                }
+            }
+            .id("fileGrid-\(model.path)")
+            .onAppear { scrollGridToTop(proxy) }
+            .onChange(of: model.path) { _ in scrollGridToTop(proxy) }
+        }
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.18))
+    }
+
+    private func scrollGridToTop(_ proxy: ScrollViewProxy) {
+        DispatchQueue.main.async {
+            proxy.scrollTo("grid-top", anchor: .top)
+        }
+    }
+
+    private func gridCell(_ entry: DeviceFileEntry) -> some View {
+        let selected = model.selectedPaths.contains(entry.path)
+        return VStack(spacing: 6) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.primary.opacity(0.055))
+                if DeviceThumbnailView.supports(entry) {
+                    DeviceThumbnailView(entry: entry, adbPath: model.adbPath, serial: model.serial)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
+                } else {
+                    Image(systemName: entry.iconName)
+                        .font(.system(size: 34))
+                        .foregroundStyle(entry.isDirectory ? Color.accentColor : .secondary)
+                }
+            }
+            .frame(height: 92)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+            VStack(spacing: 2) {
+                Text(entry.name)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .multilineTextAlignment(.center)
+                    .truncationMode(.middle)
+                if !entry.isDirectory {
+                    Text(byteString(entry.size))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                if let target = entry.linkTarget {
+                    Text("→ \(target)")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity)
+        .background(
+            selected ? Color.accentColor.opacity(0.42) : Color.clear,
+            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(selected ? Color.accentColor : Color.clear, lineWidth: 1.5)
+        )
+        .background(RowHitTarget(path: entry.path))
+        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .onTapGesture { handleGridClick(entry) }
+        .contextMenu { rowContextMenu(entry) }
+        .help(entry.path)
+    }
+
+    private func handleGridClick(_ entry: DeviceFileEntry) {
+        let flags = NSEvent.modifierFlags
+        if flags.contains(.command) {
+            if model.selectedPaths.contains(entry.path) {
+                model.selectedPaths.remove(entry.path)
+            } else {
+                model.selectedPaths.insert(entry.path)
+            }
+            gridAnchorPath = entry.path
+        } else if flags.contains(.shift) {
+            let entries = model.visibleEntries
+            let anchor = gridAnchorPath ?? model.selectedPaths.first ?? entry.path
+            if let start = entries.firstIndex(where: { $0.path == anchor }),
+               let end = entries.firstIndex(where: { $0.path == entry.path }) {
+                let range = start <= end ? start...end : end...start
+                model.selectedPaths = Set(entries[range].map(\.path))
+            } else {
+                model.selectedPaths = [entry.path]
+            }
+        } else {
+            model.selectedPaths = [entry.path]
+            gridAnchorPath = entry.path
+        }
     }
 
     private func fileRow(_ entry: DeviceFileEntry, index: Int) -> some View {

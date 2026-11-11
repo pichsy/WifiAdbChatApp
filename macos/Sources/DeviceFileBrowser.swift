@@ -163,6 +163,7 @@ final class DeviceFileBrowserModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var statusText = "正在读取手机目录…"
     @Published var selectedPaths: Set<String> = []
+    @Published var isGrid = false
     @Published var showHidden = false
     @Published var isBusy = false
     @Published var transferProgress: Int?
