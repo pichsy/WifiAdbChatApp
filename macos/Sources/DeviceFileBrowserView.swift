@@ -259,6 +259,20 @@ struct DeviceFileBrowserView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .contextMenu {
+            blankContextMenu
+        }
+    }
+
+    @ViewBuilder
+    private var blankContextMenu: some View {
+        Menu("新建") {
+            Button("文件") { promptCreate(in: model.path, isDirectory: false) }
+            Button("文件夹") { promptCreate(in: model.path, isDirectory: true) }
+        }
+        Button("上传到当前目录…") { upload(to: model.path) }
+        Divider()
+        Button("刷新") { model.refresh() }
     }
 
     private var pathBar: some View {
@@ -390,6 +404,12 @@ struct DeviceFileBrowserView: View {
             model.selectedPath = entry.path
         }
         .contextMenu {
+            Menu("新建") {
+                Button("文件") { promptCreate(in: creationDirectory(for: entry), isDirectory: false) }
+                Button("文件夹") { promptCreate(in: creationDirectory(for: entry), isDirectory: true) }
+            }
+            Button("上传到当前目录…") { upload(to: model.path) }
+            Divider()
             Button(entry.isDirectory ? "打开文件夹" : "打开文件") {
                 model.selectedPath = entry.path
                 model.open(entry)
@@ -457,6 +477,52 @@ struct DeviceFileBrowserView: View {
 
     // MARK: - 动作
 
+    /// 右键文件夹：建在文件夹里；右键文件 / 空白：建在当前目录。
+    private func creationDirectory(for entry: DeviceFileEntry) -> String {
+        entry.isDirectory ? entry.path : model.path
+    }
+
+    private func promptCreate(in directory: String, isDirectory: Bool) {
+        guard !model.isBusy else { return }
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = isDirectory ? "新建文件夹" : "新建文件"
+        alert.informativeText = "位置：\(directory)"
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+        field.placeholderString = isDirectory ? "文件夹名称" : "文件名（可带扩展名）"
+        alert.accessoryView = field
+        alert.addButton(withTitle: "取消")
+        alert.addButton(withTitle: "创建")
+        alert.window.initialFirstResponder = field
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertSecondButtonReturn else { return }
+        let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let error = nameValidationError(name) {
+            showNameError(error)
+            return
+        }
+        model.create(name: name, isDirectory: isDirectory, in: directory)
+    }
+
+    private func nameValidationError(_ name: String) -> String? {
+        if name.isEmpty { return "名称不能为空。" }
+        if name == "." || name == ".." { return "名称不能是 . 或 ..。" }
+        if name.contains("/") { return "名称不能包含 /。" }
+        if name.rangeOfCharacter(from: .newlines) != nil { return "名称不能包含换行。" }
+        if name.utf8.count > 255 { return "名称不能超过 255 个字节。" }
+        return nil
+    }
+
+    private func showNameError(_ message: String) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "名称无效"
+        alert.informativeText = message
+        alert.addButton(withTitle: "好")
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
+    }
+
     private func confirmDeleteSelected() {
         guard let entry = model.selectedEntry else { return }
         confirmDelete(entry)
@@ -501,7 +567,7 @@ struct DeviceFileBrowserView: View {
         }
     }
 
-    private func upload() {
+    private func upload(to destination: String? = nil) {
         let panel = NSOpenPanel()
         panel.title = "上传到手机"
         panel.prompt = "上传"
@@ -510,7 +576,7 @@ struct DeviceFileBrowserView: View {
         panel.canChooseFiles = true
         panel.directoryURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
         if panel.runModal() == .OK {
-            model.upload(panel.urls)
+            model.upload(panel.urls, to: destination)
         }
     }
 

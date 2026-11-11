@@ -382,15 +382,19 @@ final class DeviceFileBrowserModel: ObservableObject {
 
     // MARK: - 上传
 
-    func upload(_ urls: [URL]) {
+    func upload(_ urls: [URL], to destination: String? = nil) {
         guard !urls.isEmpty, !isBusy else { return }
+        let directory = DevicePath.normalize(destination ?? path)
+        guard !DevicePath.isHostOnlyPath(directory) else {
+            statusText = "只能上传到手机目录"
+            return
+        }
         isBusy = true
         transferProgress = 0
         statusText = "正在上传 \(urls.count) 个文件…"
 
         let adb = adbPath
         let serial = self.serial
-        let directory = path
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             var failure: String?
             for (index, url) in urls.enumerated() {
@@ -418,7 +422,48 @@ final class DeviceFileBrowserModel: ObservableObject {
                     self.statusText = failure
                 } else {
                     self.statusText = "已上传 \(urls.count) 项"
-                    self.reload()
+                    if directory == self.path {
+                        self.reload()
+                    } else {
+                        self.navigate(to: directory)
+                    }
+                }
+            }
+        }
+    }
+
+    /// 在指定目录新建空文件或文件夹，成功后进入该目录并选中新项目。
+    func create(name: String, isDirectory: Bool, in directory: String) {
+        guard !isBusy else { return }
+        guard !name.isEmpty, name != ".", name != "..", !name.contains("/") else {
+            statusText = "名称无效"
+            return
+        }
+        let parent = DevicePath.normalize(directory)
+        guard !DevicePath.isHostOnlyPath(parent) else {
+            statusText = "只能操作手机目录"
+            return
+        }
+        let target = DevicePath.join(parent, name)
+        isBusy = true
+        statusText = isDirectory ? "正在新建文件夹…" : "正在新建文件…"
+        let adb = adbPath
+        let serial = self.serial
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let result = ADB.create(adb: adb, serial: serial, path: target, isDirectory: isDirectory)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.isBusy = false
+                if result.ok {
+                    self.statusText = "已新建 \(name)"
+                    if parent == self.path {
+                        self.pendingSelectionPath = target
+                        self.reload()
+                    } else {
+                        self.navigate(to: parent, selecting: target)
+                    }
+                } else {
+                    self.statusText = ADB.fileBrowserError(result, fallback: "新建失败")
                 }
             }
         }
@@ -481,6 +526,24 @@ extension ADB {
             return (nil, fileBrowserError(result, fallback: "无法读取 \(path)"))
         }
         return (DeviceFileParser.parse(result.text, directory: path), nil)
+    }
+
+    /// 在手机上新建空文件或文件夹；先检查同名，避免覆盖已有内容。
+    static func create(adb: String, serial: String, path: String, isDirectory: Bool) -> ShellResult {
+        let target = DevicePath.normalize(path)
+        guard target != "/" else {
+            return ShellResult(status: -1, text: "不能在手机根目录执行这个操作", launched: true)
+        }
+        guard !DevicePath.isHostOnlyPath(target) else {
+            return ShellResult(status: -1, text: "只能操作手机目录", launched: true)
+        }
+        let quoted = shellQuote(target)
+        let check = run(adb, ["-s", serial, "shell", "if [ -e \(quoted) ]; then echo __adbtype_exists__; fi"], timeout: 15)
+        if check.ok, check.text.contains("__adbtype_exists__") {
+            return ShellResult(status: -1, text: "同名文件或文件夹已存在", launched: true)
+        }
+        let command = isDirectory ? "mkdir \(quoted)" : ": > \(quoted)"
+        return run(adb, ["-s", serial, "shell", command], timeout: 20)
     }
 
     /// 删除手机上的文件或文件夹；只接受手机绝对路径，根目录直接拒绝。
