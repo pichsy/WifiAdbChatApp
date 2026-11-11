@@ -7,6 +7,7 @@ struct DeviceFileBrowserView: View {
     @State private var pathDraft: String
     @State private var toastMessage: String?
     @State private var toastWork: DispatchWorkItem?
+    @State private var hoveredEntryPath: String?
 
     init(adbPath: String, device: ADBDevice) {
         _model = StateObject(wrappedValue: DeviceFileBrowserModel(adbPath: adbPath,
@@ -78,6 +79,11 @@ struct DeviceFileBrowserView: View {
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: toastMessage)
+        .background(
+            RightClickObserver(hoveredPath: hoveredEntryPath) { path in
+                model.selectedPath = path
+            }
+        )
     }
 
     // MARK: - 顶部
@@ -397,6 +403,9 @@ struct DeviceFileBrowserView: View {
             }
         }
         .contentShape(Rectangle())
+        .onHover { hovering in
+            hoveredEntryPath = hovering ? entry.path : nil
+        }
         .onTapGesture(count: 2) {
             model.selectedPath = entry.path
             model.open(entry)
@@ -591,5 +600,63 @@ struct DeviceFileBrowserView: View {
         let work = DispatchWorkItem { toastMessage = nil }
         toastWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.2, execute: work)
+    }
+}
+
+/// 右键菜单打开前，把鼠标当前悬停的行设为选中，避免菜单目标和蓝色选中行不一致。
+private struct RightClickObserver: NSViewRepresentable {
+    let hoveredPath: String?
+    let onSelect: (String) -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = PassthroughView()
+        context.coordinator.install()
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.parent = self
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.uninstall()
+    }
+
+    final class Coordinator {
+        var parent: RightClickObserver
+        private var monitor: Any?
+
+        init(parent: RightClickObserver) {
+            self.parent = parent
+        }
+
+        func install() {
+            guard monitor == nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .rightMouseDown) { [weak self] event in
+                guard let self,
+                      let window = event.window,
+                      window.title.hasPrefix("设备文件"),
+                      let path = self.parent.hoveredPath else {
+                    return event
+                }
+                self.parent.onSelect(path)
+                return event
+            }
+        }
+
+        func uninstall() {
+            if let monitor {
+                NSEvent.removeMonitor(monitor)
+                self.monitor = nil
+            }
+        }
+
+        deinit { uninstall() }
+    }
+
+    private final class PassthroughView: NSView {
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
     }
 }
