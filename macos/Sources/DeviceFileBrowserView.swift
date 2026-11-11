@@ -442,8 +442,9 @@ struct DeviceFileBrowserView: View {
         .disabled(model.isBusy)
         Divider()
         Button("复制路径") {
-            model.copyPath(entry.path)
-            showToast("已复制路径")
+            let paths = multipleSelected ? model.selectedEntries.map(\.path) : [entry.path]
+            model.copyPaths(paths)
+            showToast(paths.count == 1 ? "已复制路径" : "已复制 \(paths.count) 条路径")
         }
         Divider()
         Button {

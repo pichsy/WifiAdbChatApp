@@ -617,9 +617,15 @@ final class DeviceFileBrowserModel: ObservableObject {
     }
 
     func copyPath(_ path: String) {
+        copyPaths([path])
+    }
+
+    /// 多选复制：所有路径用换行符拼接，粘贴时每行一个路径。
+    func copyPaths(_ paths: [String]) {
+        guard !paths.isEmpty else { return }
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(path, forType: .string)
-        statusText = "已复制路径"
+        NSPasteboard.general.setString(paths.joined(separator: "\n"), forType: .string)
+        statusText = paths.count == 1 ? "已复制路径" : "已复制 \(paths.count) 条路径"
     }
 
     func revealLastDownload() {
