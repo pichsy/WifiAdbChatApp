@@ -55,6 +55,9 @@ struct DeviceFileBrowserView: View {
                         model.selectedPaths = [path]
                     }
                 },
+                onSingleClick: { path in
+                    model.selectedPaths = [path]
+                },
                 onOpen: { path in
                     if let entry = model.entry(for: path) { model.open(entry) }
                 }
@@ -708,6 +711,7 @@ private struct RowHitTarget: NSViewRepresentable {
 
 private struct RightClickObserver: NSViewRepresentable {
     let onSelect: (String) -> Void
+    let onSingleClick: (String) -> Void
     let onOpen: (String) -> Void
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
     func makeNSView(context: Context) -> NSView {
@@ -747,6 +751,10 @@ private struct RightClickObserver: NSViewRepresentable {
                     if event.clickCount == 1 {
                         self.lastLeftPath = path
                         self.lastLeftTime = now
+                        let modifiers = event.modifierFlags.intersection([.command, .shift])
+                        if modifiers.isEmpty, let path {
+                            self.parent.onSingleClick(path)
+                        }
                     } else if event.clickCount == 2,
                               let path,
                               path == self.lastLeftPath,
