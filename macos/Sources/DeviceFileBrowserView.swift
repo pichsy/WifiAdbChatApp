@@ -28,6 +28,7 @@ struct DeviceFileBrowserView: View {
         Location(name: "图片", path: "/sdcard/Pictures", icon: "photo"),
         Location(name: "相机", path: "/sdcard/DCIM", icon: "camera"),
         Location(name: "临时目录", path: "/data/local/tmp", icon: "clock"),
+        Location(name: "应用数据", path: "/data/data", icon: "shippingbox"),
         Location(name: "根目录", path: "/", icon: "externaldrive")
     ]
 

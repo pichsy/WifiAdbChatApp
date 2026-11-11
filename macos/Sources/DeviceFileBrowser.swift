@@ -72,6 +72,12 @@ enum DevicePath {
         return parent.isEmpty ? "/" : parent
     }
 
+    /// 应用数据目录只允许浏览；删除、新建、上传都不应落到 /data 下。
+    static func isAppDataPath(_ path: String) -> Bool {
+        let normalized = normalize(path)
+        return normalized == "/data" || normalized == "/data/data" || normalized.hasPrefix("/data/data/")
+    }
+
     /// 只允许手机路径；防止把 Mac 的 /Users、/Volumes 等宿主路径当成设备目录。
     static func isHostOnlyPath(_ path: String) -> Bool {
         let lower = path.lowercased()
@@ -119,6 +125,29 @@ enum DeviceFileParser {
             return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
         }
         return entries
+    }
+
+    /// /data/data 普通 shell 不可读时，用 pm list packages 合成包名目录；
+    /// 只有 debuggable 应用进入后才会再尝试 run-as。
+    static func parsePackages(_ output: String, directory: String) -> [DeviceFileEntry] {
+        var names = Set<String>()
+        for rawLine in output.components(separatedBy: "\n") {
+            let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard line.hasPrefix("package:") else { continue }
+            let name = String(line.dropFirst("package:".count))
+            guard !name.isEmpty, !name.contains("/") else { continue }
+            names.insert(name)
+        }
+        return names.sorted { $0.localizedStandardCompare($1) == .orderedAscending }.map { name in
+            DeviceFileEntry(name: name,
+                            path: DevicePath.join(directory, name),
+                            isDirectory: true,
+                            isSymlink: false,
+                            size: 0,
+                            modified: "—",
+                            permissions: "app",
+                            linkTarget: nil)
+        }
     }
 }
 
@@ -389,6 +418,10 @@ final class DeviceFileBrowserModel: ObservableObject {
             statusText = "只能上传到手机目录"
             return
         }
+        guard !DevicePath.isAppDataPath(directory) else {
+            statusText = "应用数据目录只能浏览，不能上传"
+            return
+        }
         isBusy = true
         transferProgress = 0
         statusText = "正在上传 \(urls.count) 个文件…"
@@ -444,6 +477,10 @@ final class DeviceFileBrowserModel: ObservableObject {
             statusText = "只能操作手机目录"
             return
         }
+        guard !DevicePath.isAppDataPath(parent) else {
+            statusText = "应用数据目录只能浏览，不能新建"
+            return
+        }
         let target = DevicePath.join(parent, name)
         isBusy = true
         statusText = isDirectory ? "正在新建文件夹…" : "正在新建文件…"
@@ -479,6 +516,10 @@ final class DeviceFileBrowserModel: ObservableObject {
         }
         guard !DevicePath.isHostOnlyPath(target) else {
             statusText = "只能删除手机目录里的内容"
+            return
+        }
+        guard !DevicePath.isAppDataPath(target) else {
+            statusText = "应用数据目录只能浏览，不能删除"
             return
         }
 
@@ -518,14 +559,67 @@ final class DeviceFileBrowserModel: ObservableObject {
 extension ADB {
     /// 列出手机目录。ls 的原始输出交给 DeviceFileParser，UI 不直接解析。
     static func listDirectory(adb: String, serial: String, path: String) -> (entries: [DeviceFileEntry]?, error: String?) {
+        let target = DevicePath.normalize(path)
         // 末尾必须带 /，否则 toybox ls 会把 /sdcard 这类符号链接本身列出来，而不是目录内容。
-        let listingPath = path == "/" ? "/" : (path.hasSuffix("/") ? path : path + "/")
+        let listingPath = target == "/" ? "/" : (target.hasSuffix("/") ? target : target + "/")
         let command = "ls -la " + shellQuote(listingPath)
         let result = run(adb, ["-s", serial, "shell", command], timeout: 25)
-        guard result.ok else {
-            return (nil, fileBrowserError(result, fallback: "无法读取 \(path)"))
+        if result.ok {
+            return (DeviceFileParser.parse(result.text, directory: target), nil)
         }
-        return (DeviceFileParser.parse(result.text, directory: path), nil)
+
+        // /data + /data/data：普通 shell 通常被 SELinux 拒绝，但包名可以通过 pm 列出来。
+        if target == "/data" {
+            let dataEntry = DeviceFileEntry(name: "data",
+                                            path: "/data/data",
+                                            isDirectory: true,
+                                            isSymlink: false,
+                                            size: 0,
+                                            modified: "—",
+                                            permissions: "dir",
+                                            linkTarget: nil)
+            return ([dataEntry], nil)
+        }
+        if target == "/data/data" {
+            if let packages = listPackages(adb: adb, serial: serial) {
+                return (packages, nil)
+            }
+        }
+        if target.hasPrefix("/data/data/") {
+            if let runAs = listWithRunAs(adb: adb, serial: serial, path: target) {
+                return runAs
+            }
+        }
+        return (nil, fileBrowserError(result, fallback: "无法读取 \(target)"))
+    }
+
+    private static func listPackages(adb: String, serial: String) -> [DeviceFileEntry]? {
+        let result = run(adb, ["-s", serial, "shell", "pm list packages"], timeout: 25)
+        guard result.ok else { return nil }
+        let entries = DeviceFileParser.parsePackages(result.text, directory: "/data/data")
+        return entries.isEmpty ? nil : entries
+    }
+
+    /// debuggable 应用的数据目录：普通 shell 不可读，改用 run-as 以应用自身身份列目录。
+    private static func listWithRunAs(adb: String, serial: String, path: String) -> (entries: [DeviceFileEntry]?, error: String?)? {
+        let prefix = "/data/data/"
+        let relative = String(path.dropFirst(prefix.count))
+        let components = relative.split(separator: "/").map(String.init)
+        guard let package = components.first, !package.isEmpty else { return nil }
+        let subpath = components.dropFirst().joined(separator: "/")
+        let command = "run-as " + shellQuote(package) + " ls -la " + shellQuote(subpath.isEmpty ? "." : subpath)
+        let result = run(adb, ["-s", serial, "shell", command], timeout: 25)
+        if result.ok {
+            return (DeviceFileParser.parse(result.text, directory: path), nil)
+        }
+        let lower = result.text.lowercased()
+        if lower.contains("not debuggable") {
+            return (nil, "\(package) 不是 debuggable 应用，无法读取它的数据目录")
+        }
+        if lower.contains("not an application") {
+            return (nil, "\(package) 没有可访问的应用数据目录")
+        }
+        return (nil, fileBrowserError(result, fallback: "无法读取 \(path)"))
     }
 
     /// 在手机上新建空文件或文件夹；先检查同名，避免覆盖已有内容。
@@ -555,6 +649,9 @@ extension ADB {
         guard !DevicePath.isHostOnlyPath(target) else {
             return ShellResult(status: -1, text: "只能删除手机目录里的内容", launched: true)
         }
+        guard !DevicePath.isAppDataPath(target) else {
+            return ShellResult(status: -1, text: "应用数据目录只能浏览，不能删除", launched: true)
+        }
         let command = "rm -rf " + shellQuote(target)
         return run(adb, ["-s", serial, "shell", command], timeout: 30)
     }
@@ -563,7 +660,12 @@ extension ADB {
 
     /// 判断手机路径类型；[ -d ] / [ -e ] 跟随软链，且只操作手机路径。
     static func itemKind(adb: String, serial: String, path: String) -> ItemKind {
-        let quoted = shellQuote(path)
+        let normalized = DevicePath.normalize(path)
+        // /data/data 对普通 shell 不可读，但包目录本身按目录处理；是否能展开由 run-as 再判断。
+        if normalized == "/data" || normalized == "/data/data" || normalized.hasPrefix("/data/data/") {
+            return .directory
+        }
+        let quoted = shellQuote(normalized)
         let command = "if [ -d \(quoted) ]; then echo __adbtype_dir__; elif [ -e \(quoted) ]; then echo __adbtype_file__; else echo __adbtype_missing__; fi"
         let result = run(adb, ["-s", serial, "shell", command], timeout: 15)
         guard result.ok else { return .missing }
