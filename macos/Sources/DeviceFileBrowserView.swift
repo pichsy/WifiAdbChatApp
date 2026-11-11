@@ -428,6 +428,7 @@ struct DeviceFileBrowserView: View {
         Button(entry.isDirectory ? "打开文件夹" : "打开文件") {
             model.open(entry)
         }
+        .disabled(multipleSelected || model.isBusy)
         Button("下载到 Mac…") {
             downloadEntries(deleteTargets(for: entry))
         }
