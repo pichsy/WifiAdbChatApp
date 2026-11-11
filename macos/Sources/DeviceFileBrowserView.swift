@@ -49,11 +49,16 @@ struct DeviceFileBrowserView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
         .background(
-            RightClickObserver { path in
-                if !model.selectedPaths.contains(path) {
-                    model.selectedPaths = [path]
+            RightClickObserver(
+                onSelect: { path in
+                    if !model.selectedPaths.contains(path) {
+                        model.selectedPaths = [path]
+                    }
+                },
+                onOpen: { path in
+                    if let entry = model.entry(for: path) { model.open(entry) }
                 }
-            }
+            )
         )
         .onAppear {
             pathDraft = model.path
@@ -702,6 +707,7 @@ private struct RowHitTarget: NSViewRepresentable {
 
 private struct RightClickObserver: NSViewRepresentable {
     let onSelect: (String) -> Void
+    let onOpen: (String) -> Void
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
     func makeNSView(context: Context) -> NSView {
         let view = PassthroughView()
@@ -713,23 +719,48 @@ private struct RightClickObserver: NSViewRepresentable {
 
     final class Coordinator {
         var parent: RightClickObserver
-        private var monitor: Any?
+        private var rightMonitor: Any?
+        private var leftMonitor: Any?
+        private var lastLeftPath: String?
+        private var lastLeftTime: TimeInterval = 0
         init(parent: RightClickObserver) { self.parent = parent }
 
+        private func path(for event: NSEvent) -> String? {
+            guard let window = event.window else { return nil }
+            let screenPoint = window.convertPoint(toScreen: event.locationInWindow)
+            return RowHitRegistry.shared.path(at: screenPoint)
+        }
+
         func install() {
-            guard monitor == nil else { return }
-            monitor = NSEvent.addLocalMonitorForEvents(matching: .rightMouseDown) { [weak self] event in
-                guard let self, let window = event.window else { return event }
-                let screenPoint = window.convertPoint(toScreen: event.locationInWindow)
-                if let path = RowHitRegistry.shared.path(at: screenPoint) {
-                    self.parent.onSelect(path)
+            if rightMonitor == nil {
+                rightMonitor = NSEvent.addLocalMonitorForEvents(matching: .rightMouseDown) { [weak self] event in
+                    if let self, let path = self.path(for: event) { self.parent.onSelect(path) }
+                    return event
                 }
-                return event
+            }
+            if leftMonitor == nil {
+                leftMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+                    guard let self else { return event }
+                    let now = ProcessInfo.processInfo.systemUptime
+                    let path = self.path(for: event)
+                    if event.clickCount == 1 {
+                        self.lastLeftPath = path
+                        self.lastLeftTime = now
+                    } else if event.clickCount == 2,
+                              let path,
+                              path == self.lastLeftPath,
+                              now - self.lastLeftTime < 0.8 {
+                        self.parent.onOpen(path)
+                        self.lastLeftPath = nil
+                    }
+                    return event
+                }
             }
         }
 
         func uninstall() {
-            if let monitor { NSEvent.removeMonitor(monitor); self.monitor = nil }
+            if let rightMonitor { NSEvent.removeMonitor(rightMonitor); self.rightMonitor = nil }
+            if let leftMonitor { NSEvent.removeMonitor(leftMonitor); self.leftMonitor = nil }
         }
         deinit { uninstall() }
     }
