@@ -162,7 +162,7 @@ final class DeviceFileBrowserModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var statusText = "正在读取手机目录…"
-    @Published var selectedPath: String?
+    @Published var selectedPaths: Set<String> = []
     @Published var showHidden = false
     @Published var isBusy = false
     @Published var transferProgress: Int?
@@ -179,9 +179,22 @@ final class DeviceFileBrowserModel: ObservableObject {
         self.path = DevicePath.normalize(startPath)
     }
 
+    /// 单选时返回该路径；多选时返回 nil。保留这个 computed 属性给只适合单选的按钮使用。
+    var selectedPath: String? {
+        get { selectedPaths.count == 1 ? selectedPaths.first : nil }
+        set { selectedPaths = newValue.map { [$0] } ?? [] }
+    }
+
+    var selectedEntries: [DeviceFileEntry] {
+        entries.filter { selectedPaths.contains($0.path) }
+    }
+
     var selectedEntry: DeviceFileEntry? {
-        guard let selectedPath else { return nil }
-        return entries.first { $0.path == selectedPath }
+        selectedPaths.count == 1 ? selectedEntries.first : nil
+    }
+
+    func entry(for path: String) -> DeviceFileEntry? {
+        entries.first { $0.path == path }
     }
 
     /// 根目录下只隐藏系统软链和不可访问的占位项；保留 /sdcard 这类用户存储快捷方式。
@@ -230,12 +243,13 @@ final class DeviceFileBrowserModel: ObservableObject {
                     self.statusText = "共 \(self.visibleEntries.count) 项"
                     if let pending = self.pendingSelectionPath {
                         if entries.contains(where: { $0.path == pending }) {
-                            self.selectedPath = pending
+                            self.selectedPaths = [pending]
+                        } else {
+                            self.selectedPaths.removeAll()
                         }
                         self.pendingSelectionPath = nil
-                    } else if let selected = self.selectedPath,
-                              !entries.contains(where: { $0.path == selected }) {
-                        self.selectedPath = nil
+                    } else {
+                        self.selectedPaths.formIntersection(Set(entries.map(\.path)))
                     }
                 } else {
                     self.entries = []
@@ -258,7 +272,7 @@ final class DeviceFileBrowserModel: ObservableObject {
             if backStack.count > 50 { backStack.removeFirst() }
         }
         path = target
-        selectedPath = nil
+        selectedPaths.removeAll()
         pendingSelectionPath = selection
         reload()
     }
@@ -300,7 +314,7 @@ final class DeviceFileBrowserModel: ObservableObject {
     func goBack() {
         guard let previous = backStack.popLast() else { return }
         path = previous
-        selectedPath = nil
+        selectedPaths.removeAll()
         pendingSelectionPath = nil
         reload()
     }
@@ -389,6 +403,52 @@ final class DeviceFileBrowserModel: ObservableObject {
                     try? FileManager.default.removeItem(at: destination)
                     self.statusText = ADB.fileBrowserError(result, fallback: "下载失败")
                     completion?(false)
+                }
+            }
+        }
+    }
+
+    /// 多选 / 目录下载：选择一个目标文件夹，按原名称直接保存进去，不重命名。
+    func download(_ entries: [DeviceFileEntry], to directory: URL, completion: ((Bool) -> Void)? = nil) {
+        guard !entries.isEmpty, !isBusy else { return }
+        isBusy = true
+        transferProgress = 0
+        statusText = "正在下载 \(entries.count) 项…"
+        let adb = adbPath
+        let serial = self.serial
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            var failure: String?
+            for (index, entry) in entries.enumerated() {
+                let destination = directory.appendingPathComponent(entry.name)
+                let timeout: TimeInterval = entry.isDirectory ? 600 : max(60, min(900, Double(max(entry.size, 1)) / 1024 / 1024 * 2 + 60))
+                let result = ADB.pull(adb: adb,
+                                      serial: serial,
+                                      remotePath: entry.path,
+                                      localPath: destination.path,
+                                      timeout: timeout) { value in
+                    let perFile = Double(value) / 100.0
+                    let total = (Double(index) + perFile) / Double(entries.count)
+                    let overall = Int(total * 100.0)
+                    DispatchQueue.main.async { self?.transferProgress = overall }
+                }
+                if !result.ok {
+                    failure = ADB.fileBrowserError(result, fallback: "下载 \(entry.name) 失败")
+                    break
+                }
+            }
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.isBusy = false
+                self.transferProgress = nil
+                if let failure {
+                    self.statusText = failure
+                    completion?(false)
+                } else {
+                    self.lastDownloadedURL = directory
+                    self.statusText = "已下载 \(entries.count) 项到 \(directory.lastPathComponent)"
+                    completion?(true)
                 }
             }
         }
@@ -508,37 +568,49 @@ final class DeviceFileBrowserModel: ObservableObject {
 
     /// 删除手机上的一个文件/文件夹。调用方必须先弹确认框；这里不会再询问。
     func delete(_ entry: DeviceFileEntry) {
-        guard !isBusy else { return }
-        let target = DevicePath.normalize(entry.path)
-        guard target != "/" else {
-            statusText = "不能删除手机根目录"
-            return
-        }
-        guard !DevicePath.isHostOnlyPath(target) else {
-            statusText = "只能删除手机目录里的内容"
-            return
-        }
-        guard !DevicePath.isAppDataPath(target) else {
-            statusText = "应用数据目录只能浏览，不能删除"
-            return
+        delete([entry])
+    }
+
+    /// 支持多选删除；每个目标仍会逐个执行，失败不会影响其它目标。
+    func delete(_ targets: [DeviceFileEntry]) {
+        guard !targets.isEmpty, !isBusy else { return }
+        var unique: [DeviceFileEntry] = []
+        var seen = Set<String>()
+        for entry in targets where !seen.contains(entry.path) {
+            seen.insert(entry.path)
+            let target = DevicePath.normalize(entry.path)
+            guard target != "/", !DevicePath.isHostOnlyPath(target), !DevicePath.isAppDataPath(target) else {
+                statusText = "选中项包含不可删除的手机目录"
+                return
+            }
+            unique.append(entry)
         }
 
         isBusy = true
-        statusText = "正在删除 \(entry.name)…"
+        statusText = unique.count == 1 ? "正在删除 \(unique[0].name)…" : "正在删除 \(unique.count) 项…"
         let adb = adbPath
         let serial = self.serial
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let result = ADB.remove(adb: adb, serial: serial, path: target)
+            var removed = Set<String>()
+            var failures: [String] = []
+            for entry in unique {
+                let result = ADB.remove(adb: adb, serial: serial, path: entry.path)
+                if result.ok {
+                    removed.insert(entry.path)
+                } else {
+                    failures.append("\(entry.name): \(ADB.fileBrowserError(result, fallback: "删除失败"))")
+                }
+            }
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.isBusy = false
-                if result.ok {
-                    self.entries.removeAll { $0.id == entry.id }
-                    if self.selectedPath == entry.path { self.selectedPath = nil }
-                    self.statusText = "已删除 \(entry.name)"
+                self.entries.removeAll { removed.contains($0.path) }
+                self.selectedPaths.subtract(removed)
+                if failures.isEmpty {
+                    self.statusText = unique.count == 1 ? "已删除 \(unique[0].name)" : "已删除 \(unique.count) 项"
                     self.errorMessage = nil
                 } else {
-                    self.statusText = ADB.fileBrowserError(result, fallback: "删除失败")
+                    self.statusText = "已删除 \(removed.count) 项，\(failures.count) 项失败：\(failures[0])"
                 }
             }
         }

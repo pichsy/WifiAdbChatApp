@@ -7,7 +7,6 @@ struct DeviceFileBrowserView: View {
     @State private var pathDraft: String
     @State private var toastMessage: String?
     @State private var toastWork: DispatchWorkItem?
-    @State private var rowFrames: [String: CGRect] = [:]
 
     init(adbPath: String, device: ADBDevice) {
         _model = StateObject(wrappedValue: DeviceFileBrowserModel(adbPath: adbPath,
@@ -49,6 +48,18 @@ struct DeviceFileBrowserView: View {
         .frame(minWidth: 780, minHeight: 520)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
+        .background(
+            RightClickObserver(
+                onSelect: { path in
+                    if !model.selectedPaths.contains(path) {
+                        model.selectedPaths = [path]
+                    }
+                },
+                onOpen: { path in
+                    if let entry = model.entry(for: path) { model.open(entry) }
+                }
+            )
+        )
         .onAppear {
             pathDraft = model.path
             model.reload()
@@ -56,7 +67,7 @@ struct DeviceFileBrowserView: View {
         .onChange(of: model.path) { newPath in
             pathDraft = newPath
         }
-        .onChange(of: model.selectedPath) { _ in
+        .onChange(of: model.selectedPaths) { _ in
             // 输入精确文件路径时父目录可能等于当前目录，path 不变，也要把路径栏更新到文件夹。
             pathDraft = model.path
         }
@@ -79,13 +90,6 @@ struct DeviceFileBrowserView: View {
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: toastMessage)
-        .coordinateSpace(name: "fileBrowser")
-        .onPreferenceChange(RowFramePreferenceKey.self) { rowFrames = $0 }
-        .background(
-            RightClickObserver(rowFrames: rowFrames) { path in
-                model.selectedPath = path
-            }
-        )
     }
 
     // MARK: - 顶部
@@ -115,8 +119,8 @@ struct DeviceFileBrowserView: View {
                 Label("下载", systemImage: "square.and.arrow.down")
             }
             .controlSize(.small)
-            .disabled(model.selectedEntry == nil || model.selectedEntry?.isDirectory == true || model.isBusy)
-            .help("把选中的文件下载到 Mac")
+            .disabled(model.selectedEntries.isEmpty || model.isBusy)
+            .help("把选中的文件 / 目录下载到 Mac")
 
             Button {
                 upload()
@@ -133,7 +137,7 @@ struct DeviceFileBrowserView: View {
                 Image(systemName: "trash")
             }
             .buttonStyle(.borderless)
-            .disabled(model.selectedEntry == nil || model.isBusy)
+            .disabled(model.selectedEntries.isEmpty || model.isBusy)
             .keyboardShortcut(.delete, modifiers: .command)
             .help("删除选中的文件或文件夹（⌘⌫），会先确认")
 
@@ -257,13 +261,16 @@ struct DeviceFileBrowserView: View {
                             .foregroundStyle(.secondary)
                     }
                 } else {
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            ForEach(Array(model.visibleEntries.enumerated()), id: \.element.id) { index, entry in
-                                fileRow(entry, index: index)
-                            }
+                    List(selection: $model.selectedPaths) {
+                        ForEach(Array(model.visibleEntries.enumerated()), id: \.element.id) { index, entry in
+                            fileRow(entry, index: index)
+                                .tag(entry.path)
+                                .listRowInsets(EdgeInsets())
+                                .listRowSeparator(.hidden)
                         }
                     }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -354,7 +361,7 @@ struct DeviceFileBrowserView: View {
     }
 
     private func fileRow(_ entry: DeviceFileEntry, index: Int) -> some View {
-        let selected = model.selectedPath == entry.path
+        let selected = model.selectedPaths.contains(entry.path)
         return HStack(spacing: 10) {
             Image(systemName: entry.iconName)
                 .foregroundStyle(entry.isDirectory ? Color.accentColor : .secondary)
@@ -397,59 +404,46 @@ struct DeviceFileBrowserView: View {
                 ? Color.accentColor.opacity(0.55)
                 : (index.isMultiple(of: 2) ? Color.primary.opacity(0.022) : Color.clear)
         )
+        .background(RowHitTarget(path: entry.path))
         .overlay(alignment: .leading) {
             if selected {
-                Rectangle()
-                    .fill(Color.accentColor)
-                    .frame(width: 3)
+                Rectangle().fill(Color.accentColor).frame(width: 3)
             }
         }
-        .background(
-            GeometryReader { proxy in
-                Color.clear.preference(
-                    key: RowFramePreferenceKey.self,
-                    value: [entry.path: proxy.frame(in: .named("fileBrowser"))]
-                )
-            }
-        )
         .contentShape(Rectangle())
-        .onTapGesture(count: 2) {
-            model.selectedPath = entry.path
+        .contextMenu { rowContextMenu(entry) }
+    }
+
+    @ViewBuilder
+    private func rowContextMenu(_ entry: DeviceFileEntry) -> some View {
+        let multipleSelected = model.selectedPaths.count > 1 && model.selectedPaths.contains(entry.path)
+        Menu("新建") {
+            Button("文件") { promptCreate(in: creationDirectory(for: entry), isDirectory: false) }
+            Button("文件夹") { promptCreate(in: creationDirectory(for: entry), isDirectory: true) }
+        }
+        .disabled(multipleSelected || model.isBusy)
+        Button("上传到当前目录…") { upload(to: model.path) }
+            .disabled(multipleSelected || model.isBusy)
+        Divider()
+        Button(entry.isDirectory ? "打开文件夹" : "打开文件") {
             model.open(entry)
         }
-        .onTapGesture {
-            model.selectedPath = entry.path
+        Button("下载到 Mac…") {
+            downloadEntries(deleteTargets(for: entry))
         }
-        .contextMenu {
-            Menu("新建") {
-                Button("文件") { promptCreate(in: creationDirectory(for: entry), isDirectory: false) }
-                Button("文件夹") { promptCreate(in: creationDirectory(for: entry), isDirectory: true) }
-            }
-            Button("上传到当前目录…") { upload(to: model.path) }
-            Divider()
-            Button(entry.isDirectory ? "打开文件夹" : "打开文件") {
-                model.selectedPath = entry.path
-                model.open(entry)
-            }
-            Button("下载到 Mac…") {
-                model.selectedPath = entry.path
-                downloadSelected()
-            }
-            .disabled(entry.isDirectory || model.isBusy)
-            Divider()
-            Button("复制路径") {
-                model.copyPath(entry.path)
-                showToast("已复制路径")
-            }
-            Divider()
-            Button(role: .destructive) {
-                model.selectedPath = entry.path
-                confirmDelete(entry)
-            } label: {
-                Label("删除…", systemImage: "trash")
-            }
-            .disabled(model.isBusy)
+        .disabled(model.isBusy)
+        Divider()
+        Button("复制路径") {
+            model.copyPath(entry.path)
+            showToast("已复制路径")
         }
+        Divider()
+        Button(role: .destructive) {
+            confirmDelete(deleteTargets(for: entry))
+        } label: {
+            Label("删除…", systemImage: "trash")
+        }
+        .disabled(model.isBusy)
     }
 
     // MARK: - 底部状态
@@ -477,6 +471,11 @@ struct DeviceFileBrowserView: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
+            if model.selectedPaths.count > 1 {
+                Text("已选 \(model.selectedPaths.count) 项")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             if model.lastDownloadedURL != nil {
                 Button("在 Finder 中显示") {
                     model.revealLastDownload()
@@ -540,21 +539,31 @@ struct DeviceFileBrowserView: View {
         alert.runModal()
     }
 
+    private func deleteTargets(for entry: DeviceFileEntry) -> [DeviceFileEntry] {
+        model.selectedPaths.contains(entry.path) ? model.selectedEntries : [entry]
+    }
+
     private func confirmDeleteSelected() {
-        guard let entry = model.selectedEntry else { return }
-        confirmDelete(entry)
+        guard !model.selectedEntries.isEmpty else { return }
+        confirmDelete(model.selectedEntries)
     }
 
     /// 任何删除入口都必须先到这里；默认焦点在「取消」，不会静默删除。
-    private func confirmDelete(_ entry: DeviceFileEntry) {
-        guard !model.isBusy else { return }
+    private func confirmDelete(_ entries: [DeviceFileEntry]) {
+        guard !entries.isEmpty, !model.isBusy else { return }
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = entry.isDirectory ? "删除文件夹？" : "删除文件？"
-        let detail = entry.isDirectory
-            ? "将从手机永久删除这个文件夹及其中的所有内容，此操作无法撤销。"
-            : "将从手机永久删除这个文件，此操作无法撤销。"
-        alert.informativeText = detail + "\n\n" + entry.path
+        if entries.count == 1, let entry = entries.first {
+            alert.messageText = entry.isDirectory ? "删除文件夹？" : "删除文件？"
+            let detail = entry.isDirectory
+                ? "将从手机永久删除这个文件夹及其中的所有内容，此操作无法撤销。"
+                : "将从手机永久删除这个文件，此操作无法撤销。"
+            alert.informativeText = detail + "\n\n" + entry.path
+        } else {
+            alert.messageText = "删除 \(entries.count) 个项目？"
+            let names = entries.prefix(6).map(\.name).joined(separator: "\n")
+            alert.informativeText = "将从手机永久删除选中的 \(entries.count) 个项目；文件夹会连同里面的内容一起删除。\n此操作无法撤销。\n\n\(names)"
+        }
         alert.addButton(withTitle: "取消")
         alert.addButton(withTitle: "删除")
         if #available(macOS 11.0, *) {
@@ -562,13 +571,39 @@ struct DeviceFileBrowserView: View {
         }
         NSApp.activate(ignoringOtherApps: true)
         if alert.runModal() == .alertSecondButtonReturn {
-            model.delete(entry)
+            model.delete(entries)
         }
     }
 
     private func downloadSelected() {
-        guard let entry = model.selectedEntry, !entry.isDirectory else {
-            showToast("请先选择一个文件")
+        downloadEntries(model.selectedEntries)
+    }
+
+    /// 单个文件才弹重命名保存框；目录或多选用一个目标文件夹直接保存，不重命名。
+    private func downloadEntries(_ entries: [DeviceFileEntry]) {
+        guard !entries.isEmpty else { return }
+        if entries.count == 1, let entry = entries.first, !entry.isDirectory {
+            download(entry)
+            return
+        }
+        let panel = NSOpenPanel()
+        panel.title = entries.count == 1 ? "选择保存文件夹" : "下载 \(entries.count) 个项目到…"
+        panel.prompt = "下载到这里"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.directoryURL = model.downloadsDirectory
+        if panel.runModal() == .OK, let directory = panel.url {
+            model.download(entries, to: directory) { ok in
+                if ok { showToast("已下载 \(entries.count) 项") }
+            }
+        }
+    }
+
+    private func download(_ entry: DeviceFileEntry) {
+        guard !entry.isDirectory else {
+            showToast("文件夹不能直接下载")
             return
         }
         let panel = NSSavePanel()
@@ -610,72 +645,111 @@ struct DeviceFileBrowserView: View {
     }
 }
 
-/// 右键菜单打开前，按鼠标位置找到对应的行并选中；
-/// 用行坐标而不是 hover 状态，保证菜单还开着时再次右键另一行也能切换选中。
-private struct RowFramePreferenceKey: PreferenceKey {
-    static var defaultValue: [String: CGRect] = [:]
-    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
-        value.merge(nextValue(), uniquingKeysWith: { $1 })
+/// 每行背后挂一个透明 NSView，用来把右键的屏幕坐标精确映射到行；
+/// 不依赖 SwiftUI 的 geometry 坐标，避免标题栏/滚动偏移导致选错。
+private final class RowHitRegistry {
+    static let shared = RowHitRegistry()
+    private var views: [String: WeakView] = [:]
+
+    private struct WeakView {
+        weak var view: NSView?
+    }
+
+    func register(path: String, view: NSView) {
+        views[path] = WeakView(view: view)
+    }
+
+    func unregister(path: String, view: NSView) {
+        if let existing = views[path]?.view, existing === view {
+            views.removeValue(forKey: path)
+        }
+    }
+
+    func path(at screenPoint: NSPoint) -> String? {
+        for (path, box) in views {
+            guard let view = box.view, let window = view.window else { continue }
+            let windowPoint = window.convertPoint(fromScreen: screenPoint)
+            let local = view.convert(windowPoint, from: nil)
+            if view.bounds.contains(local) { return path }
+        }
+        return nil
+    }
+}
+
+private final class RowHitView: NSView {
+    var path: String
+    init(path: String) {
+        self.path = path
+        super.init(frame: .zero)
+    }
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window != nil { RowHitRegistry.shared.register(path: path, view: self) }
+    }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    deinit { RowHitRegistry.shared.unregister(path: path, view: self) }
+}
+
+private struct RowHitTarget: NSViewRepresentable {
+    let path: String
+    func makeNSView(context: Context) -> NSView { RowHitView(path: path) }
+    func updateNSView(_ nsView: NSView, context: Context) {
+        guard let view = nsView as? RowHitView else { return }
+        if view.path != path {
+            RowHitRegistry.shared.unregister(path: view.path, view: view)
+            view.path = path
+            if view.window != nil { RowHitRegistry.shared.register(path: path, view: view) }
+        }
     }
 }
 
 private struct RightClickObserver: NSViewRepresentable {
-    let rowFrames: [String: CGRect]
     let onSelect: (String) -> Void
-
+    let onOpen: (String) -> Void
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
-
     func makeNSView(context: Context) -> NSView {
         let view = PassthroughView()
         context.coordinator.install()
         return view
     }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        context.coordinator.parent = self
-    }
-
-    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
-        coordinator.uninstall()
-    }
+    func updateNSView(_ nsView: NSView, context: Context) { context.coordinator.parent = self }
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) { coordinator.uninstall() }
 
     final class Coordinator {
         var parent: RightClickObserver
-        private var monitor: Any?
+        private var rightMonitor: Any?
+        private var leftMonitor: Any?
+        init(parent: RightClickObserver) { self.parent = parent }
 
-        init(parent: RightClickObserver) {
-            self.parent = parent
+        private func path(for event: NSEvent) -> String? {
+            guard let window = event.window else { return nil }
+            let screenPoint = window.convertPoint(toScreen: event.locationInWindow)
+            return RowHitRegistry.shared.path(at: screenPoint)
         }
 
         func install() {
-            guard monitor == nil else { return }
-            monitor = NSEvent.addLocalMonitorForEvents(matching: .rightMouseDown) { [weak self] event in
-                guard let self, let path = self.path(at: NSEvent.mouseLocation) else {
+            if rightMonitor == nil {
+                rightMonitor = NSEvent.addLocalMonitorForEvents(matching: .rightMouseDown) { [weak self] event in
+                    if let self, let path = self.path(for: event) { self.parent.onSelect(path) }
                     return event
                 }
-                self.parent.onSelect(path)
-                return event
             }
-        }
-
-        /// 鼠标屏幕坐标 -> 文件窗口内容坐标（左上原点）-> 所在行。
-        private func path(at screenPoint: NSPoint) -> String? {
-            guard let window = NSApp.windows.first(where: { $0.title.hasPrefix("设备文件") }),
-                  let content = window.contentView else { return nil }
-            let windowPoint = window.convertPoint(fromScreen: screenPoint)
-            let local = content.convert(windowPoint, from: nil)
-            let yFromTop = content.isFlipped ? local.y : content.bounds.height - local.y
-            let point = CGPoint(x: local.x, y: yFromTop)
-            return parent.rowFrames.first(where: { $0.value.contains(point) })?.key
+            if leftMonitor == nil {
+                leftMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+                    if let self, event.clickCount == 2, let path = self.path(for: event) {
+                        self.parent.onOpen(path)
+                    }
+                    return event
+                }
+            }
         }
 
         func uninstall() {
-            if let monitor {
-                NSEvent.removeMonitor(monitor)
-                self.monitor = nil
-            }
+            if let rightMonitor { NSEvent.removeMonitor(rightMonitor); self.rightMonitor = nil }
+            if let leftMonitor { NSEvent.removeMonitor(leftMonitor); self.leftMonitor = nil }
         }
-
         deinit { uninstall() }
     }
 
