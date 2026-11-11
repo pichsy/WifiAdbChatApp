@@ -71,6 +71,14 @@ enum DevicePath {
         let parent = ns.deletingLastPathComponent
         return parent.isEmpty ? "/" : parent
     }
+
+    /// 只允许手机路径；防止把 Mac 的 /Users、/Volumes 等宿主路径当成设备目录。
+    static func isHostOnlyPath(_ path: String) -> Bool {
+        let lower = path.lowercased()
+        if lower.hasPrefix("file://") { return true }
+        let hostPrefixes = ["/users/", "/volumes/", "/applications/", "/library/", "/private/"]
+        return hostPrefixes.contains { lower.hasPrefix($0) }
+    }
 }
 
 /// ls -la 的解析器，单独拆出来方便测试。
@@ -133,6 +141,7 @@ final class DeviceFileBrowserModel: ObservableObject {
     @Published private(set) var backStack: [String] = []
 
     private var loadToken = UUID()
+    private var pendingSelectionPath: String?
 
     init(adbPath: String, serial: String, deviceName: String, startPath: String = "/sdcard") {
         self.adbPath = adbPath
@@ -146,8 +155,20 @@ final class DeviceFileBrowserModel: ObservableObject {
         return entries.first { $0.path == selectedPath }
     }
 
+    /// 根目录下只隐藏系统软链和不可访问的占位项；保留 /sdcard 这类用户存储快捷方式。
+    private static let hiddenRootLinks: Set<String> = [
+        "bin", "bugreports", "cache", "d", "etc", "init"
+    ]
+
     var visibleEntries: [DeviceFileEntry] {
-        entries.filter { showHidden || !$0.isHidden }
+        entries.filter { entry in
+            if !showHidden && entry.isHidden { return false }
+            if path == "/" {
+                if entry.isSymlink && Self.hiddenRootLinks.contains(entry.name) { return false }
+                if entry.permissions.contains("?") { return false }
+            }
+            return true
+        }
     }
 
     var canGoBack: Bool { !backStack.isEmpty }
@@ -177,9 +198,14 @@ final class DeviceFileBrowserModel: ObservableObject {
                 if let entries = result.entries {
                     self.entries = entries
                     self.errorMessage = nil
-                    self.statusText = "共 \(entries.count) 项"
-                    if let selected = self.selectedPath,
-                       !entries.contains(where: { $0.path == selected }) {
+                    self.statusText = "共 \(self.visibleEntries.count) 项"
+                    if let pending = self.pendingSelectionPath {
+                        if entries.contains(where: { $0.path == pending }) {
+                            self.selectedPath = pending
+                        }
+                        self.pendingSelectionPath = nil
+                    } else if let selected = self.selectedPath,
+                              !entries.contains(where: { $0.path == selected }) {
                         self.selectedPath = nil
                     }
                 } else {
@@ -191,21 +217,62 @@ final class DeviceFileBrowserModel: ObservableObject {
         }
     }
 
-    func navigate(to rawPath: String) {
+    func navigate(to rawPath: String, selecting selection: String? = nil) {
         let target = DevicePath.normalize(rawPath)
+        guard !DevicePath.isHostOnlyPath(target) else {
+            errorMessage = "只能浏览手机目录，不能跳转到电脑的系统目录"
+            statusText = "已阻止电脑路径"
+            return
+        }
         if !path.isEmpty && target != path {
             backStack.append(path)
             if backStack.count > 50 { backStack.removeFirst() }
         }
         path = target
         selectedPath = nil
+        pendingSelectionPath = selection
         reload()
+    }
+
+    /// 路径栏输入：目录直接进入；精确文件路径则进入父目录并选中该文件，不打开文件。
+    func openPath(_ rawPath: String) {
+        let target = DevicePath.normalize(rawPath)
+        guard !DevicePath.isHostOnlyPath(target) else {
+            errorMessage = "只能浏览手机目录，不能跳转到电脑的系统目录"
+            statusText = "已阻止电脑路径"
+            return
+        }
+        let adb = adbPath
+        let serial = self.serial
+        isLoading = true
+        errorMessage = nil
+        statusText = "正在定位…"
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let kind = ADB.itemKind(adb: adb, serial: serial, path: target)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                switch kind {
+                case .directory:
+                    self.navigate(to: target)
+                case .file:
+                    let parent = DevicePath.parent(of: target)
+                    let name = (target as NSString).lastPathComponent
+                    self.navigate(to: parent, selecting: target)
+                    self.statusText = "已定位 \(name)"
+                case .missing:
+                    self.isLoading = false
+                    self.errorMessage = "路径不存在：\(target)"
+                    self.statusText = "路径不存在"
+                }
+            }
+        }
     }
 
     func goBack() {
         guard let previous = backStack.popLast() else { return }
         path = previous
         selectedPath = nil
+        pendingSelectionPath = nil
         reload()
     }
 
@@ -216,11 +283,38 @@ final class DeviceFileBrowserModel: ObservableObject {
 
     func refresh() { reload() }
 
+    func toggleHidden() {
+        showHidden.toggle()
+        statusText = "共 \(visibleEntries.count) 项"
+    }
+
     func open(_ entry: DeviceFileEntry) {
         if entry.isDirectory {
             navigate(to: entry.path)
+        } else if entry.isSymlink {
+            openSymlink(entry)
         } else {
             downloadAndOpen(entry)
+        }
+    }
+
+    /// 软链/文件夹快捷方式先确认目标是否为目录，是则跳转，不是再按文件下载。
+    private func openSymlink(_ entry: DeviceFileEntry) {
+        guard !isBusy else { return }
+        statusText = "正在解析快捷方式…"
+        let adb = adbPath
+        let serial = self.serial
+        let path = entry.path
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let isDirectory = ADB.isDirectory(adb: adb, serial: serial, path: path)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if isDirectory {
+                    self.navigate(to: path)
+                } else {
+                    self.downloadAndOpen(entry)
+                }
+            }
         }
     }
 
@@ -330,6 +424,40 @@ final class DeviceFileBrowserModel: ObservableObject {
         }
     }
 
+    /// 删除手机上的一个文件/文件夹。调用方必须先弹确认框；这里不会再询问。
+    func delete(_ entry: DeviceFileEntry) {
+        guard !isBusy else { return }
+        let target = DevicePath.normalize(entry.path)
+        guard target != "/" else {
+            statusText = "不能删除手机根目录"
+            return
+        }
+        guard !DevicePath.isHostOnlyPath(target) else {
+            statusText = "只能删除手机目录里的内容"
+            return
+        }
+
+        isBusy = true
+        statusText = "正在删除 \(entry.name)…"
+        let adb = adbPath
+        let serial = self.serial
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let result = ADB.remove(adb: adb, serial: serial, path: target)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.isBusy = false
+                if result.ok {
+                    self.entries.removeAll { $0.id == entry.id }
+                    if self.selectedPath == entry.path { self.selectedPath = nil }
+                    self.statusText = "已删除 \(entry.name)"
+                    self.errorMessage = nil
+                } else {
+                    self.statusText = ADB.fileBrowserError(result, fallback: "删除失败")
+                }
+            }
+        }
+    }
+
     func copyPath(_ path: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(path, forType: .string)
@@ -353,6 +481,37 @@ extension ADB {
             return (nil, fileBrowserError(result, fallback: "无法读取 \(path)"))
         }
         return (DeviceFileParser.parse(result.text, directory: path), nil)
+    }
+
+    /// 删除手机上的文件或文件夹；只接受手机绝对路径，根目录直接拒绝。
+    static func remove(adb: String, serial: String, path: String) -> ShellResult {
+        let target = DevicePath.normalize(path)
+        guard target != "/" else {
+            return ShellResult(status: -1, text: "不能删除手机根目录", launched: true)
+        }
+        guard !DevicePath.isHostOnlyPath(target) else {
+            return ShellResult(status: -1, text: "只能删除手机目录里的内容", launched: true)
+        }
+        let command = "rm -rf " + shellQuote(target)
+        return run(adb, ["-s", serial, "shell", command], timeout: 30)
+    }
+
+    enum ItemKind { case directory, file, missing }
+
+    /// 判断手机路径类型；[ -d ] / [ -e ] 跟随软链，且只操作手机路径。
+    static func itemKind(adb: String, serial: String, path: String) -> ItemKind {
+        let quoted = shellQuote(path)
+        let command = "if [ -d \(quoted) ]; then echo __adbtype_dir__; elif [ -e \(quoted) ]; then echo __adbtype_file__; else echo __adbtype_missing__; fi"
+        let result = run(adb, ["-s", serial, "shell", command], timeout: 15)
+        guard result.ok else { return .missing }
+        if result.text.contains("__adbtype_dir__") { return .directory }
+        if result.text.contains("__adbtype_file__") { return .file }
+        return .missing
+    }
+
+    /// 跟随软链判断目标是否为目录；[ -d ] 在 Android sh 里可用，且只操作手机路径。
+    static func isDirectory(adb: String, serial: String, path: String) -> Bool {
+        itemKind(adb: adb, serial: serial, path: path) == .directory
     }
 
     /// adb pull，带百分比回调。

@@ -54,6 +54,10 @@ struct DeviceFileBrowserView: View {
         .onChange(of: model.path) { newPath in
             pathDraft = newPath
         }
+        .onChange(of: model.selectedPath) { _ in
+            // 输入精确文件路径时父目录可能等于当前目录，path 不变，也要把路径栏更新到文件夹。
+            pathDraft = model.path
+        }
         .overlay(alignment: .bottom) {
             if let toastMessage {
                 HStack(spacing: 8) {
@@ -114,8 +118,18 @@ struct DeviceFileBrowserView: View {
             .disabled(model.isBusy)
             .help("把 Mac 上的文件 / 文件夹上传到当前目录")
 
+            Button(role: .destructive) {
+                confirmDeleteSelected()
+            } label: {
+                Image(systemName: "trash")
+            }
+            .buttonStyle(.borderless)
+            .disabled(model.selectedEntry == nil || model.isBusy)
+            .keyboardShortcut(.delete, modifiers: .command)
+            .help("删除选中的文件或文件夹（⌘⌫），会先确认")
+
             Button {
-                model.showHidden.toggle()
+                model.toggleHidden()
             } label: {
                 Image(systemName: model.showHidden ? "eye" : "eye.slash")
             }
@@ -273,11 +287,11 @@ struct DeviceFileBrowserView: View {
                 .textFieldStyle(.roundedBorder)
                 .font(.system(.body, design: .monospaced))
                 .onSubmit {
-                    model.navigate(to: pathDraft)
+                    model.openPath(pathDraft)
                 }
 
             Button("前往") {
-                model.navigate(to: pathDraft)
+                model.openPath(pathDraft)
             }
             .controlSize(.small)
             .disabled(pathDraft == model.path)
@@ -357,9 +371,16 @@ struct DeviceFileBrowserView: View {
         .frame(minHeight: 30)
         .background(
             selected
-                ? Color.accentColor.opacity(0.16)
+                ? Color.accentColor.opacity(0.55)
                 : (index.isMultiple(of: 2) ? Color.primary.opacity(0.022) : Color.clear)
         )
+        .overlay(alignment: .leading) {
+            if selected {
+                Rectangle()
+                    .fill(Color.accentColor)
+                    .frame(width: 3)
+            }
+        }
         .contentShape(Rectangle())
         .onTapGesture(count: 2) {
             model.selectedPath = entry.path
@@ -383,6 +404,14 @@ struct DeviceFileBrowserView: View {
                 model.copyPath(entry.path)
                 showToast("已复制路径")
             }
+            Divider()
+            Button(role: .destructive) {
+                model.selectedPath = entry.path
+                confirmDelete(entry)
+            } label: {
+                Label("删除…", systemImage: "trash")
+            }
+            .disabled(model.isBusy)
         }
     }
 
@@ -427,6 +456,32 @@ struct DeviceFileBrowserView: View {
     }
 
     // MARK: - 动作
+
+    private func confirmDeleteSelected() {
+        guard let entry = model.selectedEntry else { return }
+        confirmDelete(entry)
+    }
+
+    /// 任何删除入口都必须先到这里；默认焦点在「取消」，不会静默删除。
+    private func confirmDelete(_ entry: DeviceFileEntry) {
+        guard !model.isBusy else { return }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = entry.isDirectory ? "删除文件夹？" : "删除文件？"
+        let detail = entry.isDirectory
+            ? "将从手机永久删除这个文件夹及其中的所有内容，此操作无法撤销。"
+            : "将从手机永久删除这个文件，此操作无法撤销。"
+        alert.informativeText = detail + "\n\n" + entry.path
+        alert.addButton(withTitle: "取消")
+        alert.addButton(withTitle: "删除")
+        if #available(macOS 11.0, *) {
+            alert.buttons[1].hasDestructiveAction = true
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertSecondButtonReturn {
+            model.delete(entry)
+        }
+    }
 
     private func downloadSelected() {
         guard let entry = model.selectedEntry, !entry.isDirectory else {
