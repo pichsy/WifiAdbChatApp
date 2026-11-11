@@ -7,7 +7,7 @@ struct DeviceFileBrowserView: View {
     @State private var pathDraft: String
     @State private var toastMessage: String?
     @State private var toastWork: DispatchWorkItem?
-    @State private var hoveredEntryPath: String?
+    @State private var rowFrames: [String: CGRect] = [:]
 
     init(adbPath: String, device: ADBDevice) {
         _model = StateObject(wrappedValue: DeviceFileBrowserModel(adbPath: adbPath,
@@ -79,8 +79,10 @@ struct DeviceFileBrowserView: View {
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: toastMessage)
+        .coordinateSpace(name: "fileBrowser")
+        .onPreferenceChange(RowFramePreferenceKey.self) { rowFrames = $0 }
         .background(
-            RightClickObserver(hoveredPath: hoveredEntryPath) { path in
+            RightClickObserver(rowFrames: rowFrames) { path in
                 model.selectedPath = path
             }
         )
@@ -402,10 +404,15 @@ struct DeviceFileBrowserView: View {
                     .frame(width: 3)
             }
         }
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: RowFramePreferenceKey.self,
+                    value: [entry.path: proxy.frame(in: .named("fileBrowser"))]
+                )
+            }
+        )
         .contentShape(Rectangle())
-        .onHover { hovering in
-            hoveredEntryPath = hovering ? entry.path : nil
-        }
         .onTapGesture(count: 2) {
             model.selectedPath = entry.path
             model.open(entry)
@@ -603,9 +610,17 @@ struct DeviceFileBrowserView: View {
     }
 }
 
-/// 右键菜单打开前，把鼠标当前悬停的行设为选中，避免菜单目标和蓝色选中行不一致。
+/// 右键菜单打开前，按鼠标位置找到对应的行并选中；
+/// 用行坐标而不是 hover 状态，保证菜单还开着时再次右键另一行也能切换选中。
+private struct RowFramePreferenceKey: PreferenceKey {
+    static var defaultValue: [String: CGRect] = [:]
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { $1 })
+    }
+}
+
 private struct RightClickObserver: NSViewRepresentable {
-    let hoveredPath: String?
+    let rowFrames: [String: CGRect]
     let onSelect: (String) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
@@ -635,15 +650,23 @@ private struct RightClickObserver: NSViewRepresentable {
         func install() {
             guard monitor == nil else { return }
             monitor = NSEvent.addLocalMonitorForEvents(matching: .rightMouseDown) { [weak self] event in
-                guard let self,
-                      let window = event.window,
-                      window.title.hasPrefix("设备文件"),
-                      let path = self.parent.hoveredPath else {
+                guard let self, let path = self.path(at: NSEvent.mouseLocation) else {
                     return event
                 }
                 self.parent.onSelect(path)
                 return event
             }
+        }
+
+        /// 鼠标屏幕坐标 -> 文件窗口内容坐标（左上原点）-> 所在行。
+        private func path(at screenPoint: NSPoint) -> String? {
+            guard let window = NSApp.windows.first(where: { $0.title.hasPrefix("设备文件") }),
+                  let content = window.contentView else { return nil }
+            let windowPoint = window.convertPoint(fromScreen: screenPoint)
+            let local = content.convert(windowPoint, from: nil)
+            let yFromTop = content.isFlipped ? local.y : content.bounds.height - local.y
+            let point = CGPoint(x: local.x, y: yFromTop)
+            return parent.rowFrames.first(where: { $0.value.contains(point) })?.key
         }
 
         func uninstall() {
