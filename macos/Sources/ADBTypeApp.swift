@@ -16,7 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let window = note.object as? NSWindow else { return }
             self?.installMinimizeCloseButton(on: window)
         }
-        if let window = NSApp.windows.first(where: { $0.canBecomeMain }) {
+        if let window = NSApp.windows.first(where: { $0.canBecomeMain && isMainWindow($0) }) {
             installMinimizeCloseButton(on: window)
         }
     }
@@ -27,9 +27,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// 只对主窗口生效；文件浏览、截屏等辅助窗口点关闭必须真正关闭窗口。
+    private func isMainWindow(_ window: NSWindow) -> Bool {
+        if let identifier = window.identifier?.rawValue, identifier == "main" {
+            return true
+        }
+        return window.title == "文件互传助手"
+    }
+
     /// 点红色关闭按钮 = 最小化到 Dock，而不是关掉窗口 / 退出进程。
     private func installMinimizeCloseButton(on window: NSWindow) {
         guard window.canBecomeMain,
+              isMainWindow(window),
               let closeButton = window.standardWindowButton(.closeButton) else { return }
         closeButton.target = self
         closeButton.action = #selector(minimizeFromCloseButton(_:))
