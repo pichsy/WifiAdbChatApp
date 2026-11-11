@@ -9,7 +9,8 @@
 
 macOS 原生 SwiftUI 小工具（macOS 13+，无第三方依赖），包含两个页面：
 
-1. **移动设备**：在 Mac 上输入内容直接打进手机当前输入框；也支持把文件传到手机。
+1. **移动设备**：在 Mac 上输入内容直接打进手机当前输入框；也支持把文件传到手机，
+   并像 Android Studio 一样浏览手机文件。
 2. **电脑设备**：和同一局域网里的 macOS / Windows 电脑像微信一样聊天，互发文字和文件。
 
 Windows 端在 [`windows/`](../windows/)；Android / iOS 原生端在 [`mobile/`](../mobile/)；
@@ -49,6 +50,16 @@ Windows 端在 [`windows/`](../windows/)；Android / iOS 原生端在 [`mobile/`
 - 预览支持触控板捏合缩放、放大后拖拽平移、双击切换缩放；「1:1」恢复适应窗口，按钮上方小字显示当前缩放百分比；
 - 保存成功会弹一个「截屏已保存」的 toast，约 2 秒自动消失；
 - 手机锁屏 / 未授权 USB 调试时给出错误提示，不影响其他功能。
+
+> 这个功能已加进当前源码构建；`release/` 里的 2.2.0 dmg 仍是旧包，尚未重新打包。
+
+设备卡片还可以打开独立的**文件浏览**窗口：
+
+- 左侧是「内部存储 / 下载 / 图片 / 相机 / 临时目录 / 根目录」快捷入口，右侧是文件列表；
+- 列表显示名称、大小、修改时间、权限，文件夹排在前面；支持显示隐藏文件、刷新、返回/上一级、输入路径跳转；
+- 双击文件夹进入；双击文件会下载到临时目录并用默认 App 打开；
+- 选中文件可「下载到 Mac…」，也可把 Mac 上的文件 / 文件夹「上传」到当前手机目录；
+- 窗口与截屏窗口一样独立缩放，关闭后不影响主窗口；多台手机可以同时打开多个文件窗口。
 
 ### 使用手机功能
 
@@ -163,8 +174,11 @@ adb -s <serial> shell input keyevent 66              # 回车
 | `Sources/FileTransferModel.swift` | 手机文件传输（拖拽/选择/粘贴、进度、目标目录） |
 | `Sources/LANTransfer.swift` | 局域网协议核心：UDP 发现、TCP 帧、配对、文字/文件收发、聊天记录持久化 |
 | `Sources/LANTransferView.swift` | 「电脑设备」页：微信式聊天界面（设备列表 + 聊天 + 底部输入框） |
-| `Sources/MobileDeviceView.swift` | 「移动设备」页（文字 / 文件 / 截屏入口） |
+| `Sources/MobileDeviceView.swift` | 「移动设备」页（文字 / 文件 / 截屏 / 文件浏览入口） |
 | `Sources/ScreenshotSheet.swift` | 手机截屏弹窗（预览 / 刷新 / 保存 / 选目录） |
+| `Sources/DeviceFileBrowser.swift` | 手机目录解析、ADB pull、上传与浏览状态模型 |
+| `Sources/DeviceFileBrowserView.swift` | 独立文件浏览窗口 UI（侧栏 + 列表 + 下载/上传） |
+| `Sources/DeviceFileBrowserWindow.swift` | 文件浏览窗口控制器（按设备复用 / 多窗口） |
 | `Sources/ContentView.swift` | 双 Tab 容器 |
 | `Sources/ADBTypeApp.swift` | App 入口与菜单 |
 | `Resources/Info.plist` | App 版本、本地网络权限说明等 |
@@ -180,6 +194,8 @@ adb -s <serial> shell input keyevent 66              # 回车
 
 ## 更新记录
 
+- **2026-11-10 新增（待发版）**：移动设备页新增「文件」文件浏览独立窗口，支持目录导航、
+  大小/时间/权限、隐藏文件、下载到 Mac、上传到手机、默认 App 打开。
 - **2.2.0**：macOS / Windows / Android / iOS 四端版本号统一到 2.2.0；macOS 功能与 2.1.0 一致
   （移动设备截屏、可缩放窗口、1:1/缩放百分比已包含），重新出 dmg 安装包。
 - **2.1.0**：macOS / Android / iOS 三端先统一到 2.1.0，Windows 随后同版；macOS「移动设备」页新增**截屏**：

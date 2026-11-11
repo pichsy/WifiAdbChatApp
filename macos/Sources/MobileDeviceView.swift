@@ -100,6 +100,15 @@ struct MobileDeviceView: View {
                     ProgressView().controlSize(.small)
                 }
                 Button {
+                    guard let device = model.selectedDevice else { return }
+                    DeviceFileBrowserWindowController.present(adbPath: model.adbPath, device: device)
+                } label: {
+                    Label("文件", systemImage: "folder")
+                }
+                .controlSize(.small)
+                .disabled(model.devices.isEmpty || !model.adbAvailable)
+                .help("浏览手机文件")
+                Button {
                     model.captureScreenshot()
                     ScreenshotWindowController.present(model: model)
                 } label: {
