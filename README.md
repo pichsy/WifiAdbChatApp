@@ -7,7 +7,7 @@
 <a href="https://github.com/pichsy/WifiAdbChatApp/releases/tag/v2.2.0">
   <img src="https://img.shields.io/badge/release-v2.2.0-5B9BFF?style=for-the-badge&logo=github&logoColor=white" alt="Release v2.2.0" />
 </a>
-<img src="https://img.shields.io/badge/macOS-2.2.0-111111?style=for-the-badge&logo=apple&logoColor=white" alt="macOS 2.2.0" />
+<img src="https://img.shields.io/badge/macOS-2.3.0-111111?style=for-the-badge&logo=apple&logoColor=white" alt="macOS 2.3.0" />
 <img src="https://img.shields.io/badge/Windows-2.2.0-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Windows 2.2.0" />
 <img src="https://img.shields.io/badge/Android-2.2.0-34A853?style=for-the-badge&logo=android&logoColor=white" alt="Android 2.2.0" />
 <img src="https://img.shields.io/badge/iOS-2.2.0-000000?style=for-the-badge&logo=apple&logoColor=white" alt="iOS 2.2.0" />
@@ -45,7 +45,7 @@
 
 | 平台 | 版本 | 状态 | 安装包 |
 | --- | --- | --- | --- |
-| macOS 13+ | **2.2.0** | 电脑互传 + USB ADB 手机输入 / 文件 / 截屏；文件浏览为新增源码功能，待重新打包 | [dmg](release/文件互传助手-2.2.0.dmg) |
+| macOS 13+ | **2.3.0** | 电脑互传 + USB ADB 手机输入 / 文件 / 截屏；文件窗口支持列表/网格、缩略图和多选 | [dmg](release/文件互传助手-2.3.0.dmg) · [zip](release/文件互传助手-2.3.0-macOS.zip) |
 | Windows 10 1809+ / 11 x64 | **2.2.0** | 电脑互传 + 移动设备截屏；居中胶囊页签 + 圆角窗口 | [安装包](release/文件互传助手-2.2.0-安装包.exe) |
 | Android 8.0+（API 28） | **2.2.0** | 只做电脑互传；公共下载落盘 / 图片视频预览 | [APK](release/文件互传助手-Android-2.2.0.apk) |
 | iOS 17+ | **2.2.0** | 只做电脑互传；Files 可见 Downloads / 相册 / AVKit | [IPA](release/文件互传助手-iOS-2.2.0.ipa) |
@@ -78,7 +78,7 @@ Windows 端会保留离线好友并显示「连接中断，正在重连…」：
 | **文字聊天** | 左收右发、时间、复制、自动滚底；中文 / emoji 正常。 |
 | **文件传输** | 多文件选择 / 拖拽 / 粘贴；256 KiB 分块流式传输，进度、取消、失败清理。 |
 | **手机接收位置** | Android 公共 `Download/文件互传助手/`；iOS `Documents/Downloads/`（Files App 可见）+ 图片 / 视频存相册。 |
-| **手机文件浏览** | macOS「移动设备」页独立窗口：列表/网格切换、图片/GIF/视频缩略图、目录/路径、大小/时间/权限、隐藏文件、单选/Shift/Cmd 多选、多选按原名下载、上传、精确路径定位、右键新建/上传、批量删除、/data/data 包名与 debuggable 应用数据（源码版待重新打包）。 |
+| **手机文件浏览** | macOS「移动设备」页独立窗口：列表/网格切换、图片/GIF/视频缩略图、目录/路径、大小/时间/权限、隐藏文件、单选/Shift/Cmd 多选、多选按原名下载、上传、精确路径定位、右键新建/上传/刷新、批量删除、/data/data 包名与 debuggable 应用数据。 |
 | **图片 / 视频** | 120×90 缩略图，点击全屏缩放 / 播放；Android 用 filepicker，iOS 用 AVKit。 |
 | **多设备会话** | 每设备独立缓存、好友列表、离线保留、别名、手动 / 自动重连。 |
 | **桌面增强** | macOS 关闭 = 最小化到 Dock；Windows 关闭 = 收进托盘；Windows 移动设备页支持 ADB 截屏。 |
@@ -136,13 +136,13 @@ flowchart LR
 
 | 平台 | 文件 | 大小 | 说明 |
 | --- | --- | --- | --- |
-| macOS | [文件互传助手-2.2.0.dmg](release/文件互传助手-2.2.0.dmg) | 3.4 MB | 通用二进制（Apple 芯片 / Intel），未公证 |
+| macOS | [文件互传助手-2.3.0.dmg](release/文件互传助手-2.3.0.dmg) | 4.0 MB | 通用二进制（Apple 芯片 / Intel），未公证；另有 [zip](release/文件互传助手-2.3.0-macOS.zip) |
 | Windows | [文件互传助手-2.2.0-安装包.exe](release/文件互传助手-2.2.0-安装包.exe) | 28.1 MB | 自包含 .NET 8，安装向导 |
 | Android | [文件互传助手-Android-2.2.0.apk](release/文件互传助手-Android-2.2.0.apk) | 42 MB | release key 签名，可直接侧载 |
 | iOS | [文件互传助手-iOS-2.2.0.ipa](release/文件互传助手-iOS-2.2.0.ipa) | 2.2 MB | 未签名，需自己的 Team 重签 |
 
 - 校验值：[`release/SHA256SUMS.txt`](release/SHA256SUMS.txt) · 安装细节：[`release/README.md`](release/README.md)
-- GitHub Release：[v2.2.0](https://github.com/pichsy/WifiAdbChatApp/releases/tag/v2.2.0)（附件名因 GitHub 限制使用 ASCII）
+- GitHub Release：[v2.2.0](https://github.com/pichsy/WifiAdbChatApp/releases/tag/v2.2.0)（目前最新正式 Release 标签；macOS 2.3.0 包在 `release/` 中）
 - Android 如果装过旧 debug 签名版，需先 `adb uninstall dev.local.adbtype.mobile` 再安装新签名 APK。
 - iOS 首次运行需允许「本地网络」；图片 / 视频首次保存到相册会询问「仅添加照片」。
 
@@ -159,6 +159,7 @@ flowchart LR
 | Windows 构建 / 安装 / 防火墙 | [Windows README](windows/README.md) |
 | Android / iOS 构建 / 权限 / 存储 | [移动端 README](mobile/README.md) |
 | 协议参考对端 / 回归测试 | [mobile/tests](mobile/tests/README.md) |
+| 2.3.0 更新内容（macOS） | [发布说明](docs/release-notes-2.3.0.md) |
 | 2.2.0 更新内容 | [发布说明](docs/release-notes-2.2.0.md) |
 
 ---
@@ -209,6 +210,6 @@ flowchart LR
 
 [GitHub](https://github.com/pichsy/WifiAdbChatApp) · [Gitee](https://gitee.com/pichs/WifiAdbChatApp) · [Releases](https://github.com/pichsy/WifiAdbChatApp/releases)
 
-<sub>最后更新：2026-11-05 · v2.2.0</sub>
+<sub>最后更新：2026-11-11 · macOS v2.3.0 · 其他端 v2.2.0</sub>
 
 </div>

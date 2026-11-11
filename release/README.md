@@ -1,28 +1,30 @@
 # 发布安装包
 
-> **导航**：[项目首页](../README.md) · [文档中心](../docs/README.md) · [2.2.0 发布说明](../docs/release-notes-2.2.0.md)
+> **导航**：[项目首页](../README.md) · [文档中心](../docs/README.md) · [2.3.0 发布说明](../docs/release-notes-2.3.0.md)
 
 正式发布的安装包统一放在这里，方便直接从仓库下载。
 
 | 平台 | 版本 | 文件 | 大小 | SHA-256 |
 | --- | --- | --- | --- | --- |
-| macOS | 2.2.0 | [文件互传助手-2.2.0.dmg](文件互传助手-2.2.0.dmg) | 3.4 MB | `c2e3bbc4a50b2d61ddba242e0d510532da61203841bfba1f0a4a3a04ccd30c86` |
+| macOS | 2.3.0 | [文件互传助手-2.3.0.dmg](文件互传助手-2.3.0.dmg) | 4.0 MB | `3a11d130eb4247aab8d6be5cb1284d7c726f5b91fcfe314b35b86845dc3e2d1d` |
+| macOS（zip 备用） | 2.3.0 | [文件互传助手-2.3.0-macOS.zip](文件互传助手-2.3.0-macOS.zip) | 3.4 MB | `26da1683b9f7628a3adfee9762e605b5379dad6496a170abea4b7b164b128007` |
 | Android | 2.2.0 | [文件互传助手-Android-2.2.0.apk](文件互传助手-Android-2.2.0.apk) | 42 MB | `0bcbeccbe83978f1ec2ba4532f10d6d2932da8b3cd1f3f43ce158099d8e470eb` |
 | iOS | 2.2.0 | [文件互传助手-iOS-2.2.0.ipa](文件互传助手-iOS-2.2.0.ipa) | 2.2 MB | `84a9122d811cc6c403d6ddb37fedfb9f84892456c723c67f12ffc45f0ec58d81` |
 | Windows | 2.2.0 | [文件互传助手-2.2.0-安装包.exe](文件互传助手-2.2.0-安装包.exe) | 28.1 MB | `60ce64db9c6c253c7e398d683ea5dbfeee34f75a060e7da2ded513549b832ac2` |
 
-> 四端本轮统一为 **2.2.0**（macOS / Android / iOS / Windows）。
+> 当前 macOS 为 **2.3.0**；Windows / Android / iOS 仍为 **2.2.0**（上一轮四端统一版本）。
 > **iOS ipa 未签名**，需要用自己的 Apple Developer Team 重签后才能装真机；
 > **Android apk 已用项目 release key 签名**，可直接侧载安装；与之前的 debug 签名版本不兼容，
 > 首次安装需先卸载旧版。Windows 安装包由
 > `windows/build-release.ps1` 生成（内置 .NET 8 运行时，目标机器无需安装 .NET）。
 > 校验值也可在 [SHA256SUMS.txt](SHA256SUMS.txt) 里查到。
-> 更新内容见 [docs/release-notes-2.2.0.md](../docs/release-notes-2.2.0.md)。
+> macOS 更新内容见 [docs/release-notes-2.3.0.md](../docs/release-notes-2.3.0.md)；其它端见
+> [docs/release-notes-2.2.0.md](../docs/release-notes-2.2.0.md)。
 > Android 签名证书 SHA-256：`710a0df5cf33e705b15ee652496a0f32d2513b2120acba8537e0285a8aaa2496`。
 
 ## macOS 安装
 
-1. 下载 dmg 后双击挂载。
+1. 下载 `文件互传助手-2.3.0.dmg` 后双击挂载（或解压 `-macOS.zip`）。
 2. 把「文件互传助手.app」拖进「应用程序」；如果之前装过旧版，选择**替换**。
 3. 首次打开如果被 Gatekeeper 拦截：右键 App →「打开」；或执行 dmg 里的
    `授权并安装.sh`；macOS 15+ 也可以在「系统设置 → 隐私与安全性」点「仍要打开」。

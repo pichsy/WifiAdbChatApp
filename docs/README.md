@@ -5,7 +5,7 @@
 <h1>📚 文档中心</h1>
 
 <p>
-  文件互传助手 <b>v2.2.0</b> · macOS / Windows / Android / iOS 四端原生<br />
+  文件互传助手 <b>macOS v2.3.0</b> · Windows / Android / iOS v2.2.0<br />
   从「怎么装」到「协议怎么实现」，按需进入。
 </p>
 
@@ -36,7 +36,7 @@
 | **Windows 用户 / 开发者** | [Windows README](../windows/README.md) · [Windows 测试清单](../windows/TESTING.md) |
 | **Android / iOS 开发者** | [移动端 README](../mobile/README.md) · [Android](../mobile/android/README.md) / [iOS](../mobile/ios/README.md) |
 | **协议 / 后端** | [协议与界面规格](LAN-transfer-spec.md) · [参考对端与测试](../mobile/tests/README.md) |
-| **发布 / 维护** | [发布说明](release-notes-2.2.0.md) · [release 目录](../release/README.md) |
+| **发布 / 维护** | [2.3.0 发布说明](release-notes-2.3.0.md) · [2.2.0 发布说明](release-notes-2.2.0.md) · [release 目录](../release/README.md) |
 
 ---
 
@@ -44,7 +44,7 @@
 
 | 平台 | 最低系统 | 版本 | 适合 |
 | --- | --- | --- | --- |
-| macOS | 13+ | 2.2.0 | 电脑互传 + USB ADB 手机输入 / 文件 / 截屏 |
+| macOS | 13+ | 2.3.0 | 电脑互传 + USB ADB 手机输入 / 文件 / 截屏；文件窗口支持列表/网格 |
 | Windows | 10 1809+ / 11 x64 | 2.2.0 | 电脑互传 + 移动设备截屏；胶囊页签 / 圆角窗口 |
 | Android | 8.0+ | 2.2.0 | 只做电脑互传；公共下载 / 图片视频预览 |
 | iOS | 17+ | 2.2.0 | 只做电脑互传；Files Downloads / 相册 / AVKit |
@@ -66,7 +66,8 @@ Android APK 已用项目 release key 签名；iOS IPA 未签名，需要自己�
 | [Android 细节](../mobile/android/README.md) | Kotlin / Compose、MediaStore、filepicker、签名 |
 | [iOS 细节](../mobile/ios/README.md) | SwiftUI、Files / Photos、AVKit、XcodeGen |
 | [协议参考对端](../mobile/tests/README.md) | Python 零依赖参考实现 + 回归测试 |
-| [2.2.0 发布说明](release-notes-2.2.0.md) | 本轮功能、版本、校验值、升级提示 |
+| [2.3.0 发布说明](release-notes-2.3.0.md) | macOS 文件浏览、多选、网格缩略图与本轮校验值 |
+| [2.2.0 发布说明](release-notes-2.2.0.md) | 上一轮四端版本的功能、校验值、升级提示 |
 
 ---
 
@@ -98,13 +99,13 @@ Android APK 已用项目 release key 签名；iOS IPA 未签名，需要自己�
 
 ## 🏷️ 版本与更新
 
-- 当前版本：**v2.2.0**（macOS / Windows / Android / iOS）
-- 发布标签：[v2.2.0](https://github.com/pichsy/WifiAdbChatApp/releases/tag/v2.2.0)
-- 更新记录：[2.2.0 发布说明](release-notes-2.2.0.md)
+- 当前版本：**macOS v2.3.0**；Windows / Android / iOS **v2.2.0**
+- 发布标签：[v2.2.0](https://github.com/pichsy/WifiAdbChatApp/releases/tag/v2.2.0)（macOS 2.3.0 为本次仓库包）
+- 更新记录：[2.3.0 发布说明](release-notes-2.3.0.md)
 - 代码仓库：[GitHub](https://github.com/pichsy/WifiAdbChatApp) · [Gitee](https://gitee.com/pichs/WifiAdbChatApp)
 
 <div align="center">
 
-<sub>文档最后更新：2026-11-05 · 与 v2.2.0 安装包同步</sub>
+<sub>文档最后更新：2026-11-11 · macOS v2.3.0 · 其他端 v2.2.0</sub>
 
 </div>
