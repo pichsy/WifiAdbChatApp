@@ -429,8 +429,10 @@ struct DeviceFileBrowserView: View {
                 Button("文件夹") { promptCreate(in: creationDirectory(for: entry), isDirectory: true) }
             }
         }
-        Button("上传到当前目录…") { upload(to: model.path) }
-            .disabled(multipleSelected || model.isBusy)
+        Button(entry.isDirectory ? "上传到此文件夹…" : "上传到当前目录…") {
+            upload(to: creationDirectory(for: entry))
+        }
+        .disabled(multipleSelected || model.isBusy)
         Divider()
         Button(entry.isDirectory ? "打开文件夹" : "打开文件") {
             model.open(entry)
