@@ -433,22 +433,14 @@ struct DeviceFileBrowserView: View {
                     .lineLimit(1)
                     .multilineTextAlignment(.center)
                     .truncationMode(.middle)
-                if !entry.isDirectory {
-                    Text(byteString(entry.size))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                if let target = entry.linkTarget {
-                    Text("→ \(target)")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                }
+                Text(entry.isDirectory ? "—" : byteString(entry.size))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, minHeight: 34, maxHeight: 34, alignment: .top)
         }
         .padding(8)
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, minHeight: 148, maxHeight: 148, alignment: .top)
         .background(
             selected ? Color.accentColor.opacity(0.42) : Color.clear,
             in: RoundedRectangle(cornerRadius: 10, style: .continuous)
