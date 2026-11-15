@@ -16,6 +16,23 @@ struct DeviceFileEntry: Identifiable, Hashable {
     var id: String { path }
     var isHidden: Bool { name.hasPrefix(".") }
 
+    static let imageExtensions: Set<String> = [
+        "jpg", "jpeg", "png", "gif", "webp", "bmp", "tif", "tiff",
+        "heic", "heif", "avif", "ico"
+    ]
+    static let videoExtensions: Set<String> = [
+        "mp4", "mov", "m4v", "3gp", "3g2", "mkv", "avi", "webm",
+        "flv", "wmv", "ts", "m2ts"
+    ]
+
+    var isImageFile: Bool {
+        !isDirectory && Self.imageExtensions.contains((name as NSString).pathExtension.lowercased())
+    }
+
+    var isVideoFile: Bool {
+        !isDirectory && Self.videoExtensions.contains((name as NSString).pathExtension.lowercased())
+    }
+
     var iconName: String {
         if isDirectory { return "folder.fill" }
         if isSymlink { return "link" }
@@ -35,6 +52,22 @@ struct DeviceFileEntry: Identifiable, Hashable {
             return "doc.richtext"
         default:
             return "doc"
+        }
+    }
+}
+
+enum DeviceFileMediaFilter: String, CaseIterable, Identifiable {
+    case all
+    case images
+    case videos
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: return "全部"
+        case .images: return "图片"
+        case .videos: return "视频"
         }
     }
 }
@@ -165,6 +198,8 @@ final class DeviceFileBrowserModel: ObservableObject {
     @Published var selectedPaths: Set<String> = []
     @Published var isGrid = false
     @Published var showHidden = false
+    @Published var searchText = "" { didSet { pruneSelectionToVisible() } }
+    @Published var mediaFilter: DeviceFileMediaFilter = .all { didSet { pruneSelectionToVisible() } }
     @Published var isBusy = false
     @Published var transferProgress: Int?
     @Published var lastDownloadedURL: URL?
@@ -187,7 +222,7 @@ final class DeviceFileBrowserModel: ObservableObject {
     }
 
     var selectedEntries: [DeviceFileEntry] {
-        entries.filter { selectedPaths.contains($0.path) }
+        visibleEntries.filter { selectedPaths.contains($0.path) }
     }
 
     var selectedEntry: DeviceFileEntry? {
@@ -204,13 +239,49 @@ final class DeviceFileBrowserModel: ObservableObject {
     ]
 
     var visibleEntries: [DeviceFileEntry] {
-        entries.filter { entry in
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return entries.filter { entry in
             if !showHidden && entry.isHidden { return false }
             if path == "/" {
                 if entry.isSymlink && Self.hiddenRootLinks.contains(entry.name) { return false }
                 if entry.permissions.contains("?") { return false }
             }
+            switch mediaFilter {
+            case .all:
+                break
+            case .images:
+                if !entry.isImageFile { return false }
+            case .videos:
+                if !entry.isVideoFile { return false }
+            }
+            if !query.isEmpty && !Self.matchesSearch(entry.name, query: query) {
+                return false
+            }
             return true
+        }
+    }
+
+    /// 当前目录内的模糊过滤：先按包含匹配，再按字符顺序子序列匹配。
+    private static func matchesSearch(_ name: String, query: String) -> Bool {
+        if name.localizedCaseInsensitiveContains(query) { return true }
+        var iterator = name.lowercased().makeIterator()
+        for character in query.lowercased() {
+            var found = false
+            while let next = iterator.next() {
+                if next == character {
+                    found = true
+                    break
+                }
+            }
+            if !found { return false }
+        }
+        return true
+    }
+
+    private func pruneSelectionToVisible() {
+        let visible = Set(visibleEntries.map(\.path))
+        if !selectedPaths.isSubset(of: visible) {
+            selectedPaths.formIntersection(visible)
         }
     }
 

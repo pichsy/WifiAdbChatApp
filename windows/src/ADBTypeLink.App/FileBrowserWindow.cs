@@ -39,6 +39,7 @@ public sealed class FileBrowserWindow : Window
     private readonly string _serial;
     private readonly string _deviceName;
     private readonly ObservableCollection<FileBrowserItem> _items = new();
+    private readonly List<FileBrowserItem> _allItems = new();
     private readonly Stack<string> _backStack = new();
     private readonly HashSet<string> _selectedPaths = new(StringComparer.Ordinal);
 
@@ -57,6 +58,8 @@ public sealed class FileBrowserWindow : Window
     private readonly TextBlock _countText;
     private readonly TextBlock _titleText;
     private readonly ProgressBar _busyBar;
+    private readonly TextBox _searchBox;
+    private readonly ComboBox _mediaFilter;
     private readonly Button _openButton;
     private readonly Button _downloadButton;
     private readonly Button _deleteButton;
@@ -130,6 +133,16 @@ public sealed class FileBrowserWindow : Window
             VerticalAlignment = VerticalAlignment.Center
         };
         _busyBar = new ProgressBar { IsIndeterminate = true, Width = 80, Height = 3, IsVisible = false };
+        _searchBox = new TextBox { Watermark = "搜索当前目录", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+        _searchBox.TextChanged += (_, _) => ApplyFilters();
+        _mediaFilter = new ComboBox
+        {
+            ItemsSource = new[] { "全部", "图片", "视频" },
+            SelectedIndex = 0,
+            Width = 108,
+            FontSize = 12
+        };
+        _mediaFilter.SelectionChanged += (_, _) => ApplyFilters();
 
         _listBox = BuildFileListBox();
         _gridBox = BuildFileGridBox();
@@ -337,18 +350,38 @@ public sealed class FileBrowserWindow : Window
 
     private Control BuildContent()
     {
-        var grid = new Grid { RowDefinitions = new RowDefinitions("Auto,*") };
+        var grid = new Grid { RowDefinitions = new RowDefinitions("Auto,Auto,*") };
+        var searchBar = BuildSearchBar();
+        grid.Children.Add(searchBar);
+        Grid.SetRow(searchBar, 0);
         grid.Children.Add(_columnHeader);
-        Grid.SetRow(_columnHeader, 0);
+        Grid.SetRow(_columnHeader, 1);
 
         var host = new Grid();
         host.Children.Add(_listBox);
         host.Children.Add(_gridBox);
-        Grid.SetRow(host, 1);
+        Grid.SetRow(host, 2);
         grid.Children.Add(host);
 
         _gridBox.IsVisible = false;
         _columnHeader.IsVisible = true;
+        return grid;
+    }
+
+    private Control BuildSearchBar()
+    {
+        var grid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"),
+            Margin = new Thickness(14, 5, 14, 5),
+            ColumnSpacing = 6
+        };
+        var icon = new TextBlock { Text = "🔍", FontSize = 13, VerticalAlignment = VerticalAlignment.Center };
+        grid.Children.Add(icon);
+        Grid.SetColumn(_searchBox, 1);
+        grid.Children.Add(_searchBox);
+        Grid.SetColumn(_mediaFilter, 2);
+        grid.Children.Add(_mediaFilter);
         return grid;
     }
 
@@ -898,7 +931,7 @@ public sealed class FileBrowserWindow : Window
 
             _path = target;
             _pathBox.Text = target;
-            _items.Clear();
+            _allItems.Clear();
             foreach (var entry in entries)
             {
                 if (!_showHidden && entry.IsHidden) continue;
@@ -907,21 +940,14 @@ public sealed class FileBrowserWindow : Window
                     if (entry.IsSymlink && RootHiddenLinks.Contains(entry.Name)) continue;
                     if (entry.Permissions.Contains('?')) continue;
                 }
-                _items.Add(new FileBrowserItem(entry));
+                _allItems.Add(new FileBrowserItem(entry));
             }
 
             var select = _pendingSelectPath;
             _pendingSelectPath = null;
             _selectedPaths.Clear();
-            if (select is not null)
-            {
-                var item = _items.FirstOrDefault(item => item.Path == select);
-                if (item is not null) _selectedPaths.Add(item.Path);
-            }
-            ApplySelectionToLists();
-            _statusText.Text = $"共 {_items.Count} 项";
+            ApplyFilters(select);
             _statusText.Foreground = FindBrush("TextSecondaryBrush", Color.FromRgb(150, 150, 155));
-            if (_gridMode) EnsureThumbnails();
         }
         catch (Exception ex)
         {
@@ -934,6 +960,43 @@ public sealed class FileBrowserWindow : Window
             UpdateActions();
             UpdateLocationButtons();
         }
+    }
+
+    private void ApplyFilters(string? selectPath = null)
+    {
+        var query = _searchBox.Text?.Trim() ?? string.Empty;
+        var mode = _mediaFilter.SelectedIndex;
+        _items.Clear();
+        foreach (var item in _allItems)
+        {
+            if (mode == 1 && !ThumbnailLoader.IsImage(item.Entry)) continue;
+            if (mode == 2 && !ThumbnailLoader.IsVideo(item.Entry)) continue;
+            if (query.Length > 0 && !MatchesSearch(item.Name, query)) continue;
+            _items.Add(item);
+        }
+
+        if (selectPath is not null)
+        {
+            var item = _items.FirstOrDefault(entry => entry.Path == selectPath);
+            if (item is not null) _selectedPaths.Add(item.Path);
+        }
+        _selectedPaths.RemoveWhere(path => !_items.Any(item => item.Path == path));
+        ApplySelectionToLists();
+        _statusText.Text = _allItems.Count == _items.Count
+            ? $"共 {_items.Count} 项"
+            : $"筛选后 {_items.Count} 项 / 共 {_allItems.Count} 项";
+        if (_gridMode) EnsureThumbnails();
+    }
+
+    private static bool MatchesSearch(string name, string query)
+    {
+        if (name.Contains(query, StringComparison.OrdinalIgnoreCase)) return true;
+        var index = 0;
+        foreach (var character in name.ToLowerInvariant())
+        {
+            if (index < query.Length && character == char.ToLowerInvariant(query[index])) index++;
+        }
+        return index == query.Length;
     }
 
     private void EnsureThumbnails()

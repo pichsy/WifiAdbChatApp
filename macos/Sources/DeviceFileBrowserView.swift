@@ -231,6 +231,8 @@ struct DeviceFileBrowserView: View {
         VStack(spacing: 0) {
             pathBar
             Divider()
+            searchBar
+            Divider()
             if !model.isGrid {
                 columnHeader
                 Divider()
@@ -259,12 +261,17 @@ struct DeviceFileBrowserView: View {
                     .padding(24)
                 } else if model.visibleEntries.isEmpty {
                     VStack(spacing: 10) {
-                        Image(systemName: "folder")
+                        Image(systemName: model.entries.isEmpty ? "folder" : "line.3.horizontal.decrease.circle")
                             .font(.system(size: 30))
                             .foregroundStyle(.secondary)
-                        Text("这个目录是空的")
+                        Text(model.entries.isEmpty ? "这个目录是空的" : "没有匹配的文件")
                             .font(.callout)
                             .foregroundStyle(.secondary)
+                        if !model.entries.isEmpty {
+                            Text("试试换个搜索词，或切换为「全部」")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                 } else if model.isGrid {
                     fileGrid
@@ -358,6 +365,38 @@ struct DeviceFileBrowserView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+    }
+
+    /// 路径框下方：当前目录模糊搜索 + 全部/图片/视频过滤；两个条件叠加。
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("搜索当前目录", text: $model.searchText)
+                .textFieldStyle(.roundedBorder)
+                .font(.callout)
+            if !model.searchText.isEmpty {
+                Button {
+                    model.searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.borderless)
+                .help("清空搜索")
+            }
+            Spacer(minLength: 12)
+            Picker("", selection: $model.mediaFilter) {
+                ForEach(DeviceFileMediaFilter.allCases) { filter in
+                    Text(filter.title).tag(filter)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 210)
+            .help("按文件类型过滤，和搜索叠加")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
     }
 
     private var columnHeader: some View {
