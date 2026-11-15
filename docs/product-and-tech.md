@@ -9,8 +9,8 @@
 > 不登录、不传云、不装驱动。同一个 Wi-Fi 下，电脑 / 手机自动发现、配对，像聊天一样互传文字和文件；
 > 插上 USB，macOS / Windows 还能把文字、文件和手机当前屏幕直接送进手机。
 >
-> **当前版本**：macOS 2.3.0 · Windows 2.3.0 · Android 2.2.0 · iOS 2.2.0
-> **更新**：2026-11-11 · **适用**：产品 / 测试 / 新同学
+> **当前版本**：macOS 2.4.0 · Windows 2.4.0 · Android 2.2.0 · iOS 2.2.0
+> **更新**：2026-11-15 · **适用**：产品 / 测试 / 新同学
 
 ## 目录
 
@@ -330,14 +330,14 @@ macOS / Windows 通信，手机之间也能在同一局域网配对：
 
 ## 8. 下载与快速开始
 
-- macOS：[`release/文件互传助手-2.3.0.dmg`](../release/文件互传助手-2.3.0.dmg)
-  （macOS 13+，arm64 + x86_64；另有 [zip](../release/文件互传助手-2.3.0-macOS.zip)）
+- macOS：[`release/文件互传助手-2.4.0.dmg`](../release/文件互传助手-2.4.0.dmg)
+  （macOS 13+，arm64 + x86_64；另有 [zip](../release/文件互传助手-2.4.0-macOS.zip)）
 - Android：[`release/文件互传助手-Android-2.2.0.apk`](../release/文件互传助手-Android-2.2.0.apk)
   （Android 8.0+，release key 签名）
 - iOS：[`release/文件互传助手-iOS-2.2.0.ipa`](../release/文件互传助手-iOS-2.2.0.ipa)
   （iOS 17+，未签名，需自行重签）
 - Windows：[`release/文件互传助手-2.2.0-安装包.exe`](../release/文件互传助手-2.2.0-安装包.exe)
-  （旧安装包；2.3.0 文件窗口用 `windows/build.ps1` 构建，安装包待重打）
+  （旧安装包；2.4.0 文件窗口用 `windows/build.ps1` 构建，安装包待重打）
 - 校验值：[`release/SHA256SUMS.txt`](../release/SHA256SUMS.txt)
 
 从源码构建：

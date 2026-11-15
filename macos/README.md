@@ -1,7 +1,7 @@
 # 文件互传助手 · macOS 端
 
 <p align="center">
-  <img src="https://img.shields.io/badge/macOS-2.3.0-111111?style=for-the-badge&logo=apple&logoColor=white" alt="macOS 2.3.0" />
+  <img src="https://img.shields.io/badge/macOS-2.4.0-111111?style=for-the-badge&logo=apple&logoColor=white" alt="macOS 2.4.0" />
   <img src="https://img.shields.io/badge/local--first-no%20server-5B9BFF?style=for-the-badge" alt="local-first" />
 </p>
 
@@ -51,7 +51,7 @@ Windows 端在 [`windows/`](../windows/)；Android / iOS 原生端在 [`mobile/`
 - 保存成功会弹一个「截屏已保存」的 toast，约 2 秒自动消失；
 - 手机锁屏 / 未授权 USB 调试时给出错误提示，不影响其他功能。
 
-> 这些功能已包含在 2.3.0 构建中；`release/` 里的 2.3.0 dmg / zip 是本次重新打包的版本。
+> 这些功能已包含在 2.4.0 构建中；`release/` 里的 2.4.0 dmg / zip 是本次重新打包的版本。
 
 设备卡片还可以打开独立的**文件浏览**窗口：
 
@@ -147,7 +147,7 @@ open 文件互传助手.app
 
 ```bash
 cd macos
-./package.sh        # 生成 macos/dist/文件互传助手-2.3.0.dmg 和 macos/dist/文件互传助手-2.3.0-macOS.zip
+./package.sh        # 生成 macos/dist/文件互传助手-2.4.0.dmg 和 macos/dist/文件互传助手-2.4.0-macOS.zip
 ```
 
 - dmg / zip 里带《安装说明.txt》和「授权并安装.sh」（可执行 shell 脚本）：在终端执行
@@ -216,6 +216,8 @@ adb -s <serial> shell input keyevent 66              # 回车
 
 ## 更新记录
 
+- **2.4.0（2026-11-15）**：文件浏览窗口路径框下方新增当前目录模糊搜索和「全部 / 图片 / 视频」
+  类型过滤，两个条件叠加；重新打包 2.4.0 dmg / zip。
 - **2.3.0（2026-11-11）**：移动设备页新增「文件」文件浏览独立窗口，支持目录导航、
   大小/时间/权限、隐藏文件、下载到 Mac、上传到手机、默认 App 打开；支持精确文件路径定位、
   软链接目录跳转、标准单选 / Shift 连选 / Cmd 多选、右键先选中目标行、右键新建文件/文件夹、
