@@ -47,4 +47,18 @@ Windows 文件管理窗口已复刻 macOS：常用目录、路径跳转、精确
 | 文件互传助手-2.4.0-macOS.zip | `6443777ef873b71b65d4dc8b9cb4dddadbc4b8111ea96af3777287127a3769ab` |
 | 文件互传助手-2.4.0-安装包.exe | `b1b12596dddf6f6ae6b2a1431f6381f7b82b9a89c3b7c8fbc86f3b57aa0d1b61` |
 
+## GitHub Release 附件名
+
+GitHub 会剥离附件名里的中文，因此 Release 附件使用 ASCII 文件名；仓库 `release/` 内仍是中文名：
+
+| GitHub Release 附件 | 仓库 release/ 文件 |
+| --- | --- |
+| WifiAdbChatApp-2.4.0.dmg | 文件互传助手-2.4.0.dmg |
+| WifiAdbChatApp-2.4.0-macOS.zip | 文件互传助手-2.4.0-macOS.zip |
+| WifiAdbChatApp-2.4.0-Windows-Setup.exe | 文件互传助手-2.4.0-安装包.exe |
+| WifiAdbChatApp-Android-2.2.0.apk | 文件互传助手-Android-2.2.0.apk |
+| WifiAdbChatApp-iOS-2.2.0-unsigned.ipa | 文件互传助手-iOS-2.2.0.ipa |
+| WifiAdbChatApp-2.4.0-Windows-Install-Notes.md | 安装说明.md |
+| SHA256SUMS.txt | 已按 GitHub 附件名重新生成 |
+
 完整产品能力与核心技术见：[docs/product-and-tech.md](product-and-tech.md)

@@ -4,8 +4,8 @@
 
 <br />
 
-<a href="https://github.com/pichsy/WifiAdbChatApp/releases/tag/v2.2.0">
-  <img src="https://img.shields.io/badge/release-v2.2.0-5B9BFF?style=for-the-badge&logo=github&logoColor=white" alt="Release v2.2.0" />
+<a href="https://github.com/pichsy/WifiAdbChatApp/releases/tag/v2.4.0">
+  <img src="https://img.shields.io/badge/release-v2.4.0-5B9BFF?style=for-the-badge&logo=github&logoColor=white" alt="Release v2.4.0" />
 </a>
 <img src="https://img.shields.io/badge/macOS-2.4.0-111111?style=for-the-badge&logo=apple&logoColor=white" alt="macOS 2.4.0" />
 <img src="https://img.shields.io/badge/Windows-2.4.0-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Windows 2.4.0" />
@@ -142,7 +142,7 @@ flowchart LR
 | iOS | [文件互传助手-iOS-2.2.0.ipa](release/文件互传助手-iOS-2.2.0.ipa) | 2.2 MB | 未签名，需自己的 Team 重签 |
 
 - 校验值：[`release/SHA256SUMS.txt`](release/SHA256SUMS.txt) · 安装细节：[`release/README.md`](release/README.md)
-- GitHub Release：[v2.2.0](https://github.com/pichsy/WifiAdbChatApp/releases/tag/v2.2.0)（目前最新正式 Release 标签；macOS 2.4.0 包在 `release/` 中）
+- GitHub Release：[v2.4.0](https://github.com/pichsy/WifiAdbChatApp/releases/tag/v2.4.0)（macOS / Windows / Android / iOS 安装包与校验值）
 - Android 如果装过旧 debug 签名版，需先 `adb uninstall dev.local.adbtype.mobile` 再安装新签名 APK。
 - iOS 首次运行需允许「本地网络」；图片 / 视频首次保存到相册会询问「仅添加照片」。
 

@@ -101,7 +101,7 @@ Android APK 已用项目 release key 签名；iOS IPA 未签名，需要自己�
 ## 🏷️ 版本与更新
 
 - 当前版本：**macOS / Windows v2.4.0**；Android / iOS **v2.2.0**
-- 发布标签：[v2.2.0](https://github.com/pichsy/WifiAdbChatApp/releases/tag/v2.2.0)（macOS 2.4.0 为本次仓库包）
+- 发布标签：[v2.4.0](https://github.com/pichsy/WifiAdbChatApp/releases/tag/v2.4.0)
 - 更新记录：[2.4.0 发布说明](release-notes-2.4.0.md)
 - 代码仓库：[GitHub](https://github.com/pichsy/WifiAdbChatApp) · [Gitee](https://gitee.com/pichs/WifiAdbChatApp)
 
