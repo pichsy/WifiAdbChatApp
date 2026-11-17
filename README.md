@@ -46,7 +46,7 @@
 | 平台 | 版本 | 状态 | 安装包 |
 | --- | --- | --- | --- |
 | macOS 13+ | **2.4.0** | 电脑互传 + USB ADB 手机输入 / 文件 / 截屏；文件窗口支持当前目录搜索、类型过滤、列表/网格、缩略图和多选 | [dmg](release/文件互传助手-2.4.0.dmg) · [zip](release/文件互传助手-2.4.0-macOS.zip) |
-| Windows 10 1809+ / 11 x64 | **2.4.0** | 电脑互传 + 移动设备截屏 + 手机文件管理（搜索/过滤）；居中胶囊页签 + 圆角窗口 | [源码构建](windows/README.md) |
+| Windows 10 1809+ / 11 x64 | **2.4.0** | 电脑互传 + 移动设备截屏 + 手机文件管理（搜索/过滤）；居中胶囊页签 + 圆角窗口 | [安装包](release/文件互传助手-2.4.0-安装包.exe) |
 | Android 8.0+（API 28） | **2.2.0** | 只做电脑互传；公共下载落盘 / 图片视频预览 | [APK](release/文件互传助手-Android-2.2.0.apk) |
 | iOS 17+ | **2.2.0** | 只做电脑互传；Files 可见 Downloads / 相册 / AVKit | [IPA](release/文件互传助手-iOS-2.2.0.ipa) |
 
@@ -116,7 +116,7 @@ flowchart LR
 | 平台 | 最短路径 |
 | --- | --- |
 | **macOS** | `cd macos && ./build.sh` → 打开 `文件互传助手.app` |
-| **Windows** | 运行 `release\文件互传助手-2.2.0-安装包.exe`，或 `windows\build.ps1` |
+| **Windows** | 运行 `release\文件互传助手-2.4.0-安装包.exe`，或 `windows\build.ps1` |
 | **Android** | `cd mobile/android && ./gradlew assembleDebug`，或直接安装 release APK |
 | **iOS** | `cd mobile/ios && xcodegen generate`，再用 Xcode / `xcodebuild` 构建 |
 
@@ -137,7 +137,7 @@ flowchart LR
 | 平台 | 文件 | 大小 | 说明 |
 | --- | --- | --- | --- |
 | macOS | [文件互传助手-2.4.0.dmg](release/文件互传助手-2.4.0.dmg) | 4.0 MB | 通用二进制（Apple 芯片 / Intel），未公证；另有 [zip](release/文件互传助手-2.4.0-macOS.zip) |
-| Windows | [文件互传助手-2.2.0-安装包.exe](release/文件互传助手-2.2.0-安装包.exe) | 28.1 MB | 旧安装包；2.4.0 文件窗口请先按 [Windows README](windows/README.md) 构建 |
+| Windows | [文件互传助手-2.4.0-安装包.exe](release/文件互传助手-2.4.0-安装包.exe) | 28.1 MB | 内置 .NET 8 运行时，含文件浏览窗口；详见 [Windows README](windows/README.md) |
 | Android | [文件互传助手-Android-2.2.0.apk](release/文件互传助手-Android-2.2.0.apk) | 42 MB | release key 签名，可直接侧载 |
 | iOS | [文件互传助手-iOS-2.2.0.ipa](release/文件互传助手-iOS-2.2.0.ipa) | 2.2 MB | 未签名，需自己的 Team 重签 |
 

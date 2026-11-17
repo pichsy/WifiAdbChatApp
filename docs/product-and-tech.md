@@ -336,8 +336,8 @@ macOS / Windows 通信，手机之间也能在同一局域网配对：
   （Android 8.0+，release key 签名）
 - iOS：[`release/文件互传助手-iOS-2.2.0.ipa`](../release/文件互传助手-iOS-2.2.0.ipa)
   （iOS 17+，未签名，需自行重签）
-- Windows：[`release/文件互传助手-2.2.0-安装包.exe`](../release/文件互传助手-2.2.0-安装包.exe)
-  （旧安装包；2.4.0 文件窗口用 `windows/build.ps1` 构建，安装包待重打）
+- Windows：[`release/文件互传助手-2.4.0-安装包.exe`](../release/文件互传助手-2.4.0-安装包.exe)
+  （Windows 10 1809+ / 11 x64，内置 .NET 8 运行时，安装包由 `windows/build-release.ps1` 生成）
 - 校验值：[`release/SHA256SUMS.txt`](../release/SHA256SUMS.txt)
 
 从源码构建：

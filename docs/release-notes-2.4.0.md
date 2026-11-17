@@ -9,7 +9,7 @@
 | 平台 | 版本 | 安装包 |
 | --- | --- | --- |
 | macOS | **2.4.0**（build 15） | `文件互传助手-2.4.0.dmg` / `文件互传助手-2.4.0-macOS.zip` |
-| Windows | **2.4.0** | 用 `windows/build-release.ps1` 生成 `文件互传助手-2.4.0-安装包.exe` |
+| Windows | **2.4.0** | `文件互传助手-2.4.0-安装包.exe` |
 | Android | 2.2.0 | `文件互传助手-Android-2.2.0.apk` |
 | iOS | 2.2.0 | `文件互传助手-iOS-2.2.0.ipa` |
 
@@ -36,7 +36,7 @@ Windows 文件管理窗口已复刻 macOS：常用目录、路径跳转、精确
 ## 安装与升级
 
 - macOS：下载 `文件互传助手-2.4.0.dmg`，拖进「应用程序」覆盖旧版；
-- Windows：在 Windows 上运行 `windows\build-release.ps1` 生成安装包后覆盖安装；
+- Windows：下载 `文件互传助手-2.4.0-安装包.exe`，按向导选原安装目录覆盖安装（内置 .NET 8 运行时）；
 - 升级只替换 App，不修改聊天记录、配对关系和接收文件。
 
 ## 校验值
@@ -45,5 +45,6 @@ Windows 文件管理窗口已复刻 macOS：常用目录、路径跳转、精确
 | --- | --- |
 | 文件互传助手-2.4.0.dmg | `1ce12ba67a9a7361f71500d392e1cc69c7aa1e163e76a540b0d9c10a7eff57a7` |
 | 文件互传助手-2.4.0-macOS.zip | `6443777ef873b71b65d4dc8b9cb4dddadbc4b8111ea96af3777287127a3769ab` |
+| 文件互传助手-2.4.0-安装包.exe | `b1b12596dddf6f6ae6b2a1431f6381f7b82b9a89c3b7c8fbc86f3b57aa0d1b61` |
 
 完整产品能力与核心技术见：[docs/product-and-tech.md](product-and-tech.md)
