@@ -20,6 +20,11 @@
 > ADB 文件窗口和移动设备页的推送都要求手机已开启 USB 调试并授权本机；
 > 电脑设备聊天不需要 ADB，但需要两台设备在同一局域网并完成 6 位配对。
 
+<p align="center">
+  <img src="screenshots/macos-adb-files.jpg" width="49%" alt="macOS ADB 文件窗口" />
+  <img src="screenshots/windows-adb-files.png" width="49%" alt="Windows ADB 文件窗口" />
+</p>
+
 ---
 
 ## 1. 连接准备

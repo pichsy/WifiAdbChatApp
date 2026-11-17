@@ -13,6 +13,11 @@
 | Android | 2.2.0 | `文件互传助手-Android-2.2.0.apk` |
 | iOS | 2.2.0 | `文件互传助手-iOS-2.2.0.ipa` |
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/pichsy/WifiAdbChatApp/master/docs/screenshots/macos-adb-files.jpg" width="49%" alt="macOS ADB 文件窗口" />
+  <img src="https://raw.githubusercontent.com/pichsy/WifiAdbChatApp/master/docs/screenshots/windows-adb-files.png" width="49%" alt="Windows ADB 文件窗口" />
+</p>
+
 ## 文件窗口搜索与类型过滤
 
 - 路径输入框正下方新增搜索栏和「全部 / 图片 / 视频」过滤选项；

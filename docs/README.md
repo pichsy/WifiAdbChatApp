@@ -79,7 +79,9 @@ Android APK 已用项目 release key 签名；iOS IPA 未签名，需要自己�
 | --- | --- |
 | macOS 电脑设备 | ![macOS 电脑设备](screenshots/macos-computer-dark.jpg) |
 | macOS 移动设备 | ![macOS 移动设备](screenshots/macos-mobile-dark.jpg) |
+| macOS ADB 文件窗口 | ![macOS ADB 文件窗口](screenshots/macos-adb-files.jpg) |
 | Windows 电脑设备 | ![Windows 电脑设备](screenshots/win-pc.jpg) |
+| Windows ADB 文件窗口 | ![Windows ADB 文件窗口](screenshots/windows-adb-files.png) |
 | Windows 移动设备 | ![Windows 移动设备](screenshots/win-home.jpg) |
 | Android 聊天 | ![Android 聊天](screenshots/android-chat-media.png) |
 | iOS 聊天 | ![iOS 聊天](screenshots/ios-chat-media.png) |
