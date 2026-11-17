@@ -70,7 +70,7 @@
 - 截屏不经过云服务，不调用系统屏幕录制权限，完全由手机端 `screencap` 完成。
 
 > 完整的连接准备、目录规则、右键行为、ADB 命令对照表、macOS / Windows 差异和排错清单：
-> **[ADB 文件 / 传输 / 截屏完整说明](adb-file-transfer-screenshot.md)**。
+> **[ADB 文件 / 传输 / 截屏完整说明](https://github.com/pichsy/WifiAdbChatApp/blob/master/docs/adb-file-transfer-screenshot.md)**。
 
 ## macOS 其他更新
 

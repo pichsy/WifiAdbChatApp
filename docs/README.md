@@ -67,7 +67,7 @@ Android APK 已用项目 release key 签名；iOS IPA 未签名，需要自己�
 | [Android 细节](../mobile/android/README.md) | Kotlin / Compose、MediaStore、filepicker、签名 |
 | [iOS 细节](../mobile/ios/README.md) | SwiftUI、Files / Photos、AVKit、XcodeGen |
 | [协议参考对端](../mobile/tests/README.md) | Python 零依赖参考实现 + 回归测试 |
-| [2.4.0 发布说明](release-notes-2.4.0.md) | 文件窗口搜索、类型过滤、macOS 包校验值 |
+| [2.4.0 发布说明](release-notes-2.4.0.md) | 文件窗口搜索/过滤、ADB 文件管理 / 传输 / 截屏、包校验值 |
 | [2.3.0 发布说明](release-notes-2.3.0.md) | 文件浏览、多选、网格缩略图 |
 | [2.2.0 发布说明](release-notes-2.2.0.md) | 上一轮四端版本的功能、校验值、升级提示 |
 
