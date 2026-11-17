@@ -28,6 +28,9 @@ Windows 端在 [`windows/`](../windows/)；Android / iOS 原生端在 [`mobile/`
 
 ## 一、移动设备（手机输入 + 文件传输）
 
+> 文件窗口、快速推送、adb 命令、`/data/data` 只读边界和截屏排错的完整说明见
+> **[ADB 文件 / 传输 / 截屏](../docs/adb-file-transfer-screenshot.md)**。
+
 在 Mac 上输入内容，按 Enter，直接打进**手机当前获得焦点的输入框**。两条路径自动切换：
 
 - **纯英文 / 数字**：按钮显示「发送到输入框」，`adb shell input text <内容>`，秒发。

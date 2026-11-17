@@ -32,8 +32,8 @@
 | 我是 | 推荐阅读 |
 | --- | --- |
 | **第一次使用** | [项目首页](../README.md) → [下载安装](../release/README.md) → [常见问题](#-常见问题) |
-| **macOS 用户 / 开发者** | [macOS README](../macos/README.md) · [协议规格](LAN-transfer-spec.md) |
-| **Windows 用户 / 开发者** | [Windows README](../windows/README.md) · [Windows 测试清单](../windows/TESTING.md) |
+| **macOS 用户 / 开发者** | [macOS README](../macos/README.md) · [ADB 文件 / 传输 / 截屏](adb-file-transfer-screenshot.md) |
+| **Windows 用户 / 开发者** | [Windows README](../windows/README.md) · [ADB 文件 / 传输 / 截屏](adb-file-transfer-screenshot.md) · [Windows 测试清单](../windows/TESTING.md) |
 | **Android / iOS 开发者** | [移动端 README](../mobile/README.md) · [Android](../mobile/android/README.md) / [iOS](../mobile/ios/README.md) |
 | **协议 / 后端** | [协议与界面规格](LAN-transfer-spec.md) · [参考对端与测试](../mobile/tests/README.md) |
 | **发布 / 维护** | [2.4.0 发布说明](release-notes-2.4.0.md) · [2.3.0 发布说明](release-notes-2.3.0.md) · [release 目录](../release/README.md) |
@@ -59,6 +59,7 @@ Android APK 已用项目 release key 签名；iOS IPA 未签名，需要自己�
 | 文档 | 内容 |
 | --- | --- |
 | [产品与技术](product-and-tech.md) | 产品定位、界面、能力全景、架构、实测数据、技术栈 |
+| [ADB 文件 / 传输 / 截屏](adb-file-transfer-screenshot.md) | ADB 连接、文件窗口、搜索过滤、上传下载、/data/data、快速推送、截屏、命令与排错 |
 | [协议与界面规格](LAN-transfer-spec.md) | UDP 发现、TCP 帧、握手、消息类型、文件传输、持久化、验收清单 |
 | [macOS](../macos/README.md) | 构建、打包、手机输入 / 文件 / 截屏、调试 |
 | [Windows](../windows/README.md) | Avalonia 构建、安装包、防火墙、托盘、界面说明 |

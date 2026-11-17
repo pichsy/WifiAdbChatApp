@@ -142,6 +142,9 @@ dotnet run --project src/ADBTypeLink.App -c Release
 
 ### 移动设备（adb）
 
+> 文件窗口、快速推送、adb 命令、`/data/data` 只读边界和截屏排错的完整说明见
+> **[ADB 文件 / 传输 / 截屏](../docs/adb-file-transfer-screenshot.md)**。
+
 窗口顶部有两个页签，和 macOS 端一致：**移动设备** / **电脑设备**（「电脑设备」就是上面那套局域网聊天）。
 
 「移动设备」页通过 adb 直接操作连着的 Android 手机：

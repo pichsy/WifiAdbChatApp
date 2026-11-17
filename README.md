@@ -78,7 +78,7 @@ Windows 端会保留离线好友并显示「连接中断，正在重连…」：
 | **文字聊天** | 左收右发、时间、复制、自动滚底；中文 / emoji 正常。 |
 | **文件传输** | 多文件选择 / 拖拽 / 粘贴；256 KiB 分块流式传输，进度、取消、失败清理。 |
 | **手机接收位置** | Android 公共 `Download/文件互传助手/`；iOS `Documents/Downloads/`（Files App 可见）+ 图片 / 视频存相册。 |
-| **手机文件浏览** | macOS / Windows「移动设备」页独立窗口：当前目录模糊搜索 + 全部/图片/视频叠加过滤、列表/网格切换、图片/GIF/视频缩略图、目录/路径、大小/时间/权限、隐藏文件、单选/Shift/Cmd（Windows Ctrl）多选、多选按原名下载、上传、精确路径定位、右键新建/上传/刷新、批量删除、/data/data 包名与 debuggable 应用数据。 |
+| **ADB 手机管理** | 文件窗口：当前目录模糊搜索 + 全部/图片/视频过滤、列表/网格、缩略图、多选、右键、上传下载、批量删除、/data/data；移动设备页：文件推送与 ADB 截屏。完整说明见 [ADB 文件 / 传输 / 截屏](docs/adb-file-transfer-screenshot.md)。 |
 | **图片 / 视频** | 120×90 缩略图，点击全屏缩放 / 播放；Android 用 filepicker，iOS 用 AVKit。 |
 | **多设备会话** | 每设备独立缓存、好友列表、离线保留、别名、手动 / 自动重连。 |
 | **桌面增强** | macOS 关闭 = 最小化到 Dock；Windows 关闭 = 收进托盘；Windows 移动设备页支持 ADB 截屏。 |
@@ -155,6 +155,7 @@ flowchart LR
 | 5 分钟了解项目 / 选平台 | [文档中心](docs/README.md) |
 | 产品能力、架构、实测数据 | [产品与技术](docs/product-and-tech.md) |
 | 帧格式、握手、字段、验收 | [协议与界面规格](docs/LAN-transfer-spec.md) |
+| ADB 文件管理 / 传输 / 截屏 / 排错 | [ADB 手机管理完整说明](docs/adb-file-transfer-screenshot.md) |
 | macOS 构建 / 打包 / 限制 | [macOS README](macos/README.md) |
 | Windows 构建 / 安装 / 防火墙 | [Windows README](windows/README.md) |
 | Android / iOS 构建 / 权限 / 存储 | [移动端 README](mobile/README.md) |

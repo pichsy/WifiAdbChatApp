@@ -1,6 +1,6 @@
 # 发布安装包
 
-> **导航**：[项目首页](../README.md) · [文档中心](../docs/README.md) · [2.4.0 发布说明](../docs/release-notes-2.4.0.md)
+> **导航**：[项目首页](../README.md) · [文档中心](../docs/README.md) · [2.4.0 发布说明](../docs/release-notes-2.4.0.md) · [ADB 文件 / 传输 / 截屏](../docs/adb-file-transfer-screenshot.md)
 
 正式发布的安装包统一放在这里，方便直接从仓库下载。
 
