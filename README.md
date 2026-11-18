@@ -45,10 +45,10 @@
 
 | 平台 | 版本 | 状态 | 安装包 |
 | --- | --- | --- | --- |
-| macOS 13+ | **2.4.0** | 电脑互传 + USB ADB 手机输入 / 文件 / 截屏；文件窗口支持当前目录搜索、类型过滤、列表/网格、缩略图和多选 | [dmg](release/文件互传助手-2.4.0.dmg) · [zip](release/文件互传助手-2.4.0-macOS.zip) |
-| Windows 10 1809+ / 11 x64 | **2.4.0** | 电脑互传 + 移动设备截屏 + 手机文件管理（搜索/过滤）；居中胶囊页签 + 圆角窗口 | [安装包](release/文件互传助手-2.4.0-安装包.exe) |
-| Android 8.0+（API 28） | **2.2.0** | 只做电脑互传；公共下载落盘 / 图片视频预览 | [APK](release/文件互传助手-Android-2.2.0.apk) |
-| iOS 17+ | **2.2.0** | 只做电脑互传；Files 可见 Downloads / 相册 / AVKit | [IPA](release/文件互传助手-iOS-2.2.0.ipa) |
+| macOS 13+ | **2.4.0** | 电脑互传 + USB ADB 手机输入 / 文件 / 截屏；文件窗口支持当前目录搜索、类型过滤、列表/网格、缩略图和多选 | [dmg](https://github.com/pichsy/WifiAdbChatApp/releases/download/v2.4.0/WifiAdbChatApp-2.4.0.dmg) · [zip](https://github.com/pichsy/WifiAdbChatApp/releases/download/v2.4.0/WifiAdbChatApp-2.4.0-macOS.zip) |
+| Windows 10 1809+ / 11 x64 | **2.4.0** | 电脑互传 + 移动设备截屏 + 手机文件管理（搜索/过滤）；居中胶囊页签 + 圆角窗口 | [安装包](https://github.com/pichsy/WifiAdbChatApp/releases/download/v2.4.0/WifiAdbChatApp-2.4.0-Windows-Setup.exe) |
+| Android 8.0+（API 28） | **2.2.0** | 只做电脑互传；公共下载落盘 / 图片视频预览 | [APK](https://github.com/pichsy/WifiAdbChatApp/releases/download/v2.2.0/WifiAdbChatApp-Android-2.2.0.apk) |
+| iOS 17+ | **2.2.0** | 只做电脑互传；Files 可见 Downloads / 相册 / AVKit | [IPA](https://github.com/pichsy/WifiAdbChatApp/releases/download/v2.2.0/WifiAdbChatApp-iOS-2.2.0-unsigned.ipa) |
 
 > Android / iOS 端**不做** ADB、USB 调试、手机输入、移动设备页——只和电脑互传。
 > iOS IPA 未签名；Android APK 已用项目 release key 签名。详见[下载说明](#-下载)。
@@ -239,7 +239,7 @@ flowchart LR
 | 平台 | 最短路径 |
 | --- | --- |
 | **macOS** | `cd macos && ./build.sh` → 打开 `文件互传助手.app` |
-| **Windows** | 运行 `release\文件互传助手-2.4.0-安装包.exe`，或 `windows\build.ps1` |
+| **Windows** | 从 [GitHub Release v2.4.0](https://github.com/pichsy/WifiAdbChatApp/releases/tag/v2.4.0) 下载安装包，或运行 `windows\build.ps1` |
 | **Android** | `cd mobile/android && ./gradlew assembleDebug`，或直接安装 release APK |
 | **iOS** | `cd mobile/ios && xcodegen generate`，再用 Xcode / `xcodebuild` 构建 |
 
@@ -259,10 +259,10 @@ flowchart LR
 
 | 平台 | 文件 | 大小 | 说明 |
 | --- | --- | --- | --- |
-| macOS | [文件互传助手-2.4.0.dmg](release/文件互传助手-2.4.0.dmg) | 4.0 MB | 通用二进制（Apple 芯片 / Intel），未公证；另有 [zip](release/文件互传助手-2.4.0-macOS.zip) |
-| Windows | [文件互传助手-2.4.0-安装包.exe](release/文件互传助手-2.4.0-安装包.exe) | 28.1 MB | 内置 .NET 8 运行时，含文件浏览窗口；详见 [Windows README](windows/README.md) |
-| Android | [文件互传助手-Android-2.2.0.apk](release/文件互传助手-Android-2.2.0.apk) | 42 MB | release key 签名，可直接侧载 |
-| iOS | [文件互传助手-iOS-2.2.0.ipa](release/文件互传助手-iOS-2.2.0.ipa) | 2.2 MB | 未签名，需自己的 Team 重签 |
+| macOS | [文件互传助手-2.4.0.dmg](https://github.com/pichsy/WifiAdbChatApp/releases/download/v2.4.0/WifiAdbChatApp-2.4.0.dmg) | 4.0 MB | 通用二进制（Apple 芯片 / Intel），未公证；另有 [zip](https://github.com/pichsy/WifiAdbChatApp/releases/download/v2.4.0/WifiAdbChatApp-2.4.0-macOS.zip) |
+| Windows | [文件互传助手-2.4.0-安装包.exe](https://github.com/pichsy/WifiAdbChatApp/releases/download/v2.4.0/WifiAdbChatApp-2.4.0-Windows-Setup.exe) | 28.1 MB | 内置 .NET 8 运行时，含文件浏览窗口；详见 [Windows README](windows/README.md) |
+| Android | [文件互传助手-Android-2.2.0.apk](https://github.com/pichsy/WifiAdbChatApp/releases/download/v2.2.0/WifiAdbChatApp-Android-2.2.0.apk) | 42 MB | release key 签名，可直接侧载 |
+| iOS | [文件互传助手-iOS-2.2.0.ipa](https://github.com/pichsy/WifiAdbChatApp/releases/download/v2.2.0/WifiAdbChatApp-iOS-2.2.0-unsigned.ipa) | 2.2 MB | 未签名，需自己的 Team 重签 |
 
 - 校验值：[`release/SHA256SUMS.txt`](release/SHA256SUMS.txt) · 安装细节：[`release/README.md`](release/README.md)
 - GitHub Release：[v2.4.0](https://github.com/pichsy/WifiAdbChatApp/releases/tag/v2.4.0)（macOS / Windows / Android / iOS 安装包与校验值）
@@ -313,7 +313,7 @@ flowchart LR
 │  ├─ ios/                iOS（SwiftUI）
 │  ├─ tests/              Python 协议参考对端 + 回归测试
 │  └─ README.md
-├─ release/               正式安装包 + SHA256SUMS
+├─ release/               发布说明 + SHA256SUMS（安装包在 GitHub Releases）
 ├─ docs/
 │  ├─ README.md           文档中心
 │  ├─ product-and-tech.md 产品 / 架构 / 实测

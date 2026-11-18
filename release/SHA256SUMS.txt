@@ -1,3 +1,4 @@
+# 对应 GitHub Releases 下载附件；仓库不再保存安装包二进制
 1ce12ba67a9a7361f71500d392e1cc69c7aa1e163e76a540b0d9c10a7eff57a7  文件互传助手-2.4.0.dmg
 6443777ef873b71b65d4dc8b9cb4dddadbc4b8111ea96af3777287127a3769ab  文件互传助手-2.4.0-macOS.zip
 b1b12596dddf6f6ae6b2a1431f6381f7b82b9a89c3b7c8fbc86f3b57aa0d1b61  文件互传助手-2.4.0-安装包.exe

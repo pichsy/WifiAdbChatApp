@@ -1,16 +1,18 @@
 # 发布安装包
 
-> **导航**：[项目首页](../README.md) · [文档中心](../docs/README.md) · [2.4.0 发布说明](../docs/release-notes-2.4.0.md) · [ADB 文件 / 传输 / 截屏](../docs/adb-file-transfer-screenshot.md)
+> **导航**：[项目首页](../README.md) · [文档中心](../docs/README.md) · [GitHub Releases](https://github.com/pichsy/WifiAdbChatApp/releases) · [2.4.0 发布说明](../docs/release-notes-2.4.0.md) · [ADB 文件 / 传输 / 截屏](../docs/adb-file-transfer-screenshot.md)
 
-正式发布的安装包统一放在这里，方便直接从仓库下载。
+正式安装包统一发布在 **GitHub Releases**，仓库 `release/` 只保留本说明、安装说明和校验值，不再提交大体积二进制文件。
+
+> GitHub 会去掉附件名里的中文，实际下载名是 `WifiAdbChatApp-*`；下表中的中文名只是展示名，解压/运行不受影响。
 
 | 平台 | 版本 | 文件 | 大小 | SHA-256 |
 | --- | --- | --- | --- | --- |
-| macOS | 2.4.0 | [文件互传助手-2.4.0.dmg](文件互传助手-2.4.0.dmg) | 4.0 MB | `1ce12ba67a9a7361f71500d392e1cc69c7aa1e163e76a540b0d9c10a7eff57a7` |
-| macOS（zip 备用） | 2.4.0 | [文件互传助手-2.4.0-macOS.zip](文件互传助手-2.4.0-macOS.zip) | 3.5 MB | `6443777ef873b71b65d4dc8b9cb4dddadbc4b8111ea96af3777287127a3769ab` |
-| Android | 2.2.0 | [文件互传助手-Android-2.2.0.apk](文件互传助手-Android-2.2.0.apk) | 42 MB | `0bcbeccbe83978f1ec2ba4532f10d6d2932da8b3cd1f3f43ce158099d8e470eb` |
-| iOS | 2.2.0 | [文件互传助手-iOS-2.2.0.ipa](文件互传助手-iOS-2.2.0.ipa) | 2.2 MB | `84a9122d811cc6c403d6ddb37fedfb9f84892456c723c67f12ffc45f0ec58d81` |
-| Windows | 2.4.0 | [文件互传助手-2.4.0-安装包.exe](文件互传助手-2.4.0-安装包.exe) | 28.1 MB | `b1b12596dddf6f6ae6b2a1431f6381f7b82b9a89c3b7c8fbc86f3b57aa0d1b61` |
+| macOS | 2.4.0 | [文件互传助手-2.4.0.dmg](https://github.com/pichsy/WifiAdbChatApp/releases/download/v2.4.0/WifiAdbChatApp-2.4.0.dmg) | 4.0 MB | `1ce12ba67a9a7361f71500d392e1cc69c7aa1e163e76a540b0d9c10a7eff57a7` |
+| macOS（zip 备用） | 2.4.0 | [文件互传助手-2.4.0-macOS.zip](https://github.com/pichsy/WifiAdbChatApp/releases/download/v2.4.0/WifiAdbChatApp-2.4.0-macOS.zip) | 3.5 MB | `6443777ef873b71b65d4dc8b9cb4dddadbc4b8111ea96af3777287127a3769ab` |
+| Android | 2.2.0 | [文件互传助手-Android-2.2.0.apk](https://github.com/pichsy/WifiAdbChatApp/releases/download/v2.2.0/WifiAdbChatApp-Android-2.2.0.apk) | 42 MB | `0bcbeccbe83978f1ec2ba4532f10d6d2932da8b3cd1f3f43ce158099d8e470eb` |
+| iOS | 2.2.0 | [文件互传助手-iOS-2.2.0.ipa](https://github.com/pichsy/WifiAdbChatApp/releases/download/v2.2.0/WifiAdbChatApp-iOS-2.2.0-unsigned.ipa) | 2.2 MB | `84a9122d811cc6c403d6ddb37fedfb9f84892456c723c67f12ffc45f0ec58d81` |
+| Windows | 2.4.0 | [文件互传助手-2.4.0-安装包.exe](https://github.com/pichsy/WifiAdbChatApp/releases/download/v2.4.0/WifiAdbChatApp-2.4.0-Windows-Setup.exe) | 28.1 MB | `b1b12596dddf6f6ae6b2a1431f6381f7b82b9a89c3b7c8fbc86f3b57aa0d1b61` |
 
 > 当前 macOS / Windows 源码与安装包均为 **2.4.0**（Windows 由
 > `windows/build-release.ps1` 生成）；Android / iOS 仍为 **2.2.0**。

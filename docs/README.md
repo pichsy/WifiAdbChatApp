@@ -49,7 +49,8 @@
 | Android | 8.0+ | 2.2.0 | 只做电脑互传；公共下载 / 图片视频预览 |
 | iOS | 17+ | 2.2.0 | 只做电脑互传；Files Downloads / 相册 / AVKit |
 
-安装包、校验值和签名说明统一在 [release/README.md](../release/README.md)。
+安装包统一在 [GitHub Releases](https://github.com/pichsy/WifiAdbChatApp/releases) 下载；
+仓库 [release/README.md](../release/README.md) 保留安装说明、附件对应关系和校验值。
 Android APK 已用项目 release key 签名；iOS IPA 未签名，需要自己的 Team 重签。
 
 ---

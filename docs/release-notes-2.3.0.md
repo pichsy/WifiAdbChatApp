@@ -8,7 +8,7 @@
 
 | 平台 | 版本 | 安装包 |
 | --- | --- | --- |
-| macOS | **2.3.0**（build 14） | `文件互传助手-2.3.0.dmg` / `文件互传助手-2.3.0-macOS.zip` |
+| macOS | **2.3.0**（build 14） | [dmg](https://github.com/pichsy/WifiAdbChatApp/releases/download/v2.3.0/WifiAdbChatApp-2.3.0.dmg) / [zip](https://github.com/pichsy/WifiAdbChatApp/releases/download/v2.3.0/WifiAdbChatApp-2.3.0-macOS.zip) |
 | Windows | 2.3.0（源码构建） | `windows/build.ps1`，安装包待重打 |
 | Android | 2.2.0 | `文件互传助手-Android-2.2.0.apk` |
 | iOS | 2.2.0 | `文件互传助手-iOS-2.2.0.ipa` |

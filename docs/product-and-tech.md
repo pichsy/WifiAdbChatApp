@@ -339,14 +339,14 @@ macOS / Windows 通信，手机之间也能在同一局域网配对：
 
 ## 8. 下载与快速开始
 
-- macOS：[`release/文件互传助手-2.4.0.dmg`](../release/文件互传助手-2.4.0.dmg)
-  （macOS 13+，arm64 + x86_64；另有 [zip](../release/文件互传助手-2.4.0-macOS.zip)）
-- Android：[`release/文件互传助手-Android-2.2.0.apk`](../release/文件互传助手-Android-2.2.0.apk)
+- macOS：[文件互传助手-2.4.0.dmg](https://github.com/pichsy/WifiAdbChatApp/releases/download/v2.4.0/WifiAdbChatApp-2.4.0.dmg)
+  （macOS 13+，arm64 + x86_64；另有 [zip](https://github.com/pichsy/WifiAdbChatApp/releases/download/v2.4.0/WifiAdbChatApp-2.4.0-macOS.zip)）
+- Android：[文件互传助手-Android-2.2.0.apk](https://github.com/pichsy/WifiAdbChatApp/releases/download/v2.2.0/WifiAdbChatApp-Android-2.2.0.apk)
   （Android 8.0+，release key 签名）
-- iOS：[`release/文件互传助手-iOS-2.2.0.ipa`](../release/文件互传助手-iOS-2.2.0.ipa)
+- iOS：[文件互传助手-iOS-2.2.0.ipa](https://github.com/pichsy/WifiAdbChatApp/releases/download/v2.2.0/WifiAdbChatApp-iOS-2.2.0-unsigned.ipa)
   （iOS 17+，未签名，需自行重签）
-- Windows：[`release/文件互传助手-2.4.0-安装包.exe`](../release/文件互传助手-2.4.0-安装包.exe)
-  （Windows 10 1809+ / 11 x64，内置 .NET 8 运行时，安装包由 `windows/build-release.ps1` 生成）
+- Windows：[文件互传助手-2.4.0-安装包.exe](https://github.com/pichsy/WifiAdbChatApp/releases/download/v2.4.0/WifiAdbChatApp-2.4.0-Windows-Setup.exe)
+  （Windows 10 1809+ / 11 x64，内置 .NET 8 运行时；自行构建用 `windows/build-release.ps1`）
 - 校验值：[`release/SHA256SUMS.txt`](../release/SHA256SUMS.txt)
 
 从源码构建：
